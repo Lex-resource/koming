@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贾维斯助手开发文档：从零构建全场景AI智能体</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script>
+        // Tailwind 配置
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0a0e17',
+                        darker: '#05070a',
+                        'neon-blue': '#00f0ff',
+                        'neon-purple': '#a020f0',
+                        'neon-green': '#39ff14',
+                        'neon-pink': '#ff2a6d',
+                        'dark-blue': '#121a29',
+                        'dark-gray': '#1e293b',
+                        'light-gray': '#e0e0e0',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Roboto', 'system-ui', 'sans-serif'],
+                        mono: ['Fira Code', 'Consolas', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                },
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow-neon {
+                text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 20px currentColor;
+            }
+            .bg-grid {
+                background-image: linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px),
+                                linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px);
+                background-size: 20px 20px;
+            }
+            .scrollbar-thin {
+                scrollbar-width: thin;
+            }
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-track {
+                background: #1e293b;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background: #00f0ff;
+                border-radius: 3px;
+            }
+            .clip-path-slant {
+                clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+            }
+        }
+    </style>
+</head>
+<body class="bg-dark text-light-gray font-sans antialiased">
+    <!-- 顶部导航栏 -->
+    <header id="top-nav" class="fixed top-0 left-0 right-0 bg-darker/90 backdrop-blur-md z-50 border-b border-neon-blue/30 transition-all duration-300">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-microchip text-neon-blue text-xl"></i>
+                <h1 class="text-lg md:text-xl font-bold text-white hidden sm:block">
+                    <span class="text-neon-blue">J.A.R.V.I.S.</span> 开发文档
+                </h1>
+            </div>
+            
+            <!-- 移动端菜单按钮 -->
+            <button id="mobile-menu-btn" class="md:hidden text-neon-blue hover:text-white transition-colors">
+                <i class="fa fa-bars text-xl"></i>
+            </button>
+            
+            <!-- 桌面端导航 -->
+            <nav class="hidden md:flex items-center space-x-6">
+                <a href="#overview" class="text-light-gray hover:text-neon-blue transition-colors text-sm">项目概述</a>
+                <a href="#schedule" class="text-light-gray hover:text-neon-blue transition-colors text-sm">开发计划</a>
+                <a href="#features" class="text-light-gray hover:text-neon-blue transition-colors text-sm">核心功能</a>
+                <a href="#tech" class="text-light-gray hover:text-neon-blue transition-colors text-sm">关键技术</a>
+                <a href="#testing" class="text-light-gray hover:text-neon-blue transition-colors text-sm">测试评估</a>
+                <a href="#deployment" class="text-light-gray hover:text-neon-blue transition-colors text-sm">部署维护</a>
+                <a href="#management" class="text-light-gray hover:text-neon-blue transition-colors text-sm">项目管理</a>
+            </nav>
+        </div>
+        
+        <!-- 移动端导航菜单 -->
+        <div id="mobile-menu" class="md:hidden bg-dark-blue/95 backdrop-blur-md hidden border-t border-neon-blue/30">
+            <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
+                <a href="#overview" class="py-2 text-light-gray hover:text-neon-blue transition-colors">项目概述</a>
+                <a href="#schedule" class="py-2 text-light-gray hover:text-neon-blue transition-colors">开发计划</a>
+                <a href="#features" class="py-2 text-light-gray hover:text-neon-blue transition-colors">核心功能</a>
+                <a href="#tech" class="py-2 text-light-gray hover:text-neon-blue transition-colors">关键技术</a>
+                <a href="#testing" class="py-2 text-light-gray hover:text-neon-blue transition-colors">测试评估</a>
+                <a href="#deployment" class="py-2 text-light-gray hover:text-neon-blue transition-colors">部署维护</a>
+                <a href="#management" class="py-2 text-light-gray hover:text-neon-blue transition-colors">项目管理</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区 -->
+    <div class="container mx-auto pt-20 pb-16 flex flex-col md:flex-row">
+        <!-- 侧边导航 -->
+        <aside id="sidebar" class="hidden md:block w-64 fixed left-0 top-20 bottom-0 bg-dark-blue/80 backdrop-blur-md border-r border-neon-blue/30 overflow-y-auto scrollbar-thin transition-all duration-300">
+            <nav class="p-4">
+                <ul class="space-y-1">
+                    <!-- 项目概述 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('overview-sub')">
+                            <span><i class="fa fa-info-circle mr-2"></i>项目概述</span>
+                            <i id="overview-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="overview-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#function定位" class="text-light-gray hover:text-neon-green transition-colors">功能定位</a></li>
+                            <li><a href="#tech-stack" class="text-light-gray hover:text-neon-green transition-colors">技术栈选型</a></li>
+                            <li><a href="#system-arch" class="text-light-gray hover:text-neon-green transition-colors">系统架构</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 开发计划 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('schedule-sub')">
+                            <span><i class="fa fa-calendar mr-2"></i>开发计划</span>
+                            <i id="schedule-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="schedule-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#phase1" class="text-light-gray hover:text-neon-green transition-colors">基础架构搭建</a></li>
+                            <li><a href="#phase2" class="text-light-gray hover:text-neon-green transition-colors">核心功能开发</a></li>
+                            <li><a href="#phase3" class="text-light-gray hover:text-neon-green transition-colors">高级功能开发</a></li>
+                            <li><a href="#phase4" class="text-light-gray hover:text-neon-green transition-colors">系统优化完善</a></li>
+                            <li><a href="#phase5" class="text-light-gray hover:text-neon-green transition-colors">部署与维护</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 核心功能 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('features-sub')">
+                            <span><i class="fa fa-cogs mr-2"></i>核心功能</span>
+                            <i id="features-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="features-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#nlp-system" class="text-light-gray hover:text-neon-green transition-colors">自然语言交互</a></li>
+                            <li><a href="#env-perception" class="text-light-gray hover:text-neon-green transition-colors">环境感知系统</a></li>
+                            <li><a href="#task-management" class="text-light-gray hover:text-neon-green transition-colors">任务管理系统</a></li>
+                            <li><a href="#device-control" class="text-light-gray hover:text-neon-green transition-colors">设备控制系统</a></li>
+                            <li><a href="#knowledge-system" class="text-light-gray hover:text-neon-green transition-colors">学习与知识库</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 关键技术 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('tech-sub')">
+                            <span><i class="fa fa-code-fork mr-2"></i>关键技术</span>
+                            <i id="tech-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="tech-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#agent-collab" class="text-light-gray hover:text-neon-green transition-colors">多智能体协作</a></li>
+                            <li><a href="#multimodal" class="text-light-gray hover:text-neon-green transition-colors">多模态融合</a></li>
+                            <li><a href="#decision-making" class="text-light-gray hover:text-neon-green transition-colors">智能决策推理</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 测试评估 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('testing-sub')">
+                            <span><i class="fa fa-check-square-o mr-2"></i>测试评估</span>
+                            <i id="testing-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="testing-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#test-strategy" class="text-light-gray hover:text-neon-green transition-colors">测试策略</a></li>
+                            <li><a href="#test-cases" class="text-light-gray hover:text-neon-green transition-colors">测试用例</a></li>
+                            <li><a href="#performance-metrics" class="text-light-gray hover:text-neon-green transition-colors">性能指标</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 部署维护 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('deployment-sub')">
+                            <span><i class="fa fa-cloud-upload mr-2"></i>部署维护</span>
+                            <i id="deployment-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="deployment-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#deploy-plan" class="text-light-gray hover:text-neon-green transition-colors">部署方案</a></li>
+                            <li><a href="#maintenance" class="text-light-gray hover:text-neon-green transition-colors">维护策略</a></li>
+                            <li><a href="#upgrade-strategy" class="text-light-gray hover:text-neon-green transition-colors">升级策略</a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 项目管理 -->
+                    <li class="mb-4">
+                        <div class="flex items-center justify-between cursor-pointer text-neon-blue font-medium" onclick="toggleSubmenu('management-sub')">
+                            <span><i class="fa fa-users mr-2"></i>项目管理</span>
+                            <i id="management-icon" class="fa fa-chevron-down text-xs transition-transform duration-300"></i>
+                        </div>
+                        <ul id="management-sub" class="pl-6 mt-2 space-y-2 text-sm hidden">
+                            <li><a href="#org-structure" class="text-light-gray hover:text-neon-green transition-colors">组织结构</a></li>
+                            <li><a href="#risk-management" class="text-light-gray hover:text-neon-green transition-colors">风险管理</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="flex-1 md:ml-64 px-4 bg-grid">
+            <!-- 文档标题 -->
+            <section class="mb-12 mt-4">
+                <div class="bg-dark-blue/50 border border-neon-blue/30 rounded-lg p-6 md:p-8 clip-path-slant">
+                    <h1 class="text-3xl md:text-4xl font-bold text-white mb-4">
+                        <span class="text-neon-blue text-shadow-neon">贾维斯助手</span>开发文档
+                    </h1>
+                    <p class="text-xl text-neon-green mb-6">从零构建全场景AI智能体</p>
+                    <div class="flex flex-wrap items-center gap-4 text-sm">
+                        <span class="flex items-center"><i class="fa fa-calendar text-neon-purple mr-2"></i> 开发周期：20周</span>
+                        <span class="flex items-center"><i class="fa fa-code text-neon-purple mr-2"></i> 技术栈：CrewAI, LangChain, FastbuildAI</span>
+                        <span class="flex items-center"><i class="fa fa-brain text-neon-purple mr-2"></i> 模型：Qwen2.5-VL, Phi-4-Multimodal, Claude 3.5</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 项目概述 -->
+            <section id="overview" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-blue/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-info-circle text-neon-blue"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">一、项目概述与技术选型</h2>
+                </div>
+
+                <!-- 功能定位 -->
+                <div id="function定位" class="mb-10 bg-dark-blue/30 border border-neon-blue/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-blue/50">
+                    <h3 class="text-xl font-semibold text-neon-blue mb-4">1.1 贾维斯助手功能定位</h3>
+                    <p class="mb-4">
+                        贾维斯助手（J.A.R.V.I.S.，Just A Rather Very Intelligent System）是《钢铁侠》系列电影中托尼·斯塔克的智能管家，具备自然语言交互、环境感知、多任务处理、远程控制和自主决策等核心能力。本开发文档旨在从零开始构建一个功能尽可能接近电影中贾维斯的AI助手系统，实现全场景适用，不考虑硬件平台限制。
+                    </p>
+                    
+                    <h4 class="text-lg font-medium text-neon-green mb-3">核心功能：</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-comments-o text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">自然语言交互</h5>
+                                <p class="text-sm">支持语音和文本输入输出，能理解复杂指令，进行多轮对话</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-eye text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">环境感知</h5>
+                                <p class="text-sm">通过摄像头、麦克风等传感器感知环境，识别物体和声音</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-tasks text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">多任务处理</h5>
+                                <p class="text-sm">同时处理多个任务，如查询信息、控制设备、数据分析等</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-wifi text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">远程控制</h5>
+                                <p class="text-sm">控制各种设备和系统，如实验室设备、战甲、家居系统</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-lightbulb-o text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">自主决策</h5>
+                                <p class="text-sm">基于环境信息和用户历史行为做出智能决策</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-line-chart text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">实时数据分析</h5>
+                                <p class="text-sm">处理和分析实时数据，如监控数据、实验数据等</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-random text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">多模态交互</h5>
+                                <p class="text-sm">整合文本、语音、图像、视频等多种输入输出形式</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start p-3 bg-dark/50 rounded border border-neon-green/20">
+                            <i class="fa fa-book text-neon-green mt-1 mr-3"></i>
+                            <div>
+                                <h5 class="font-medium text-white">知识库与学习能力</h5>
+                                <p class="text-sm">不断学习新信息，更新知识库</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 技术栈选型 -->
+                <div id="tech-stack" class="mb-10 bg-dark-blue/30 border border-neon-blue/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-blue/50">
+                    <h3 class="text-xl font-semibold text-neon-blue mb-4">1.2 技术栈选型与框架选择</h3>
+                    <p class="mb-4">
+                        考虑到2025年最新的AI技术发展，结合贾维斯助手的功能需求，我们选择以下技术栈和框架：
+                    </p>
+
+                    <!-- 核心框架 -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-medium text-neon-green mb-3">1.2.1 核心框架选择</h4>
+                        <p class="mb-3">经过对2025年主流AI智能体框架的分析比较，我们选择以下框架作为贾维斯助手的基础架构：</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">CrewAI</h5>
+                                <p class="text-sm mb-2">作为主要框架，用于构建角色化多智能体系统，实现分工协作</p>
+                                <div class="text-xs text-light-gray/70">选择理由：角色化智能体编排能力非常适合构建像贾维斯这样的多功能助手</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">LangChain</h5>
+                                <p class="text-sm mb-2">用于构建基于大语言模型的应用，支持工具集成和RAG功能</p>
+                                <div class="text-xs text-light-gray/70">选择理由：提供了丰富的工具集成能力和RAG支持，可增强信息检索和处理能力</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">FastbuildAI</h5>
+                                <p class="text-sm mb-2">提供模块化工具链，支持多模态交互和本地部署</p>
+                                <div class="text-xs text-light-gray/70">选择理由：模块化设计和多模态支持有助于实现全场景适用</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">AutoGen</h5>
+                                <p class="text-sm mb-2">辅助实现多智能体协作和对话管理</p>
+                                <div class="text-xs text-light-gray/70">选择理由：多智能体对话机制可辅助实现复杂任务的协作处理</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 语言模型 -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-medium text-neon-green mb-3">1.2.2 语言模型选择</h4>
+                        <p class="mb-3">选择以下大语言模型作为贾维斯助手的"大脑"：</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="p-4 bg-dark/50 rounded border border-neon-pink/30 hover:border-neon-pink/60 transition-colors">
+                                <h5 class="font-medium text-neon-pink mb-2">Qwen2.5-VL</h5>
+                                <p class="text-sm mb-2">作为主模型，支持多模态理解和生成</p>
+                                <div class="text-xs text-light-gray/70">选择理由：在多模态理解和生成方面表现出色，原生支持4K级图像解析和时空联合建模</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-pink/30 hover:border-neon-pink/60 transition-colors">
+                                <h5 class="font-medium text-neon-pink mb-2">Phi-4-Multimodal</h5>
+                                <p class="text-sm mb-2">作为辅助模型，支持图、文、音频统一处理</p>
+                                <div class="text-xs text-light-gray/70">选择理由：在处理多模态输入方面效率高，且参数规模适中</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-pink/30 hover:border-neon-pink/60 transition-colors">
+                                <h5 class="font-medium text-neon-pink mb-2">Claude 3.5</h5>
+                                <p class="text-sm mb-2">用于需要高精度和合规性的场景</p>
+                                <div class="text-xs text-light-gray/70">选择理由：在隐私合规性和长文本处理方面有优势</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 语音与音频处理 -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-medium text-neon-green mb-3">1.2.3 语音与音频处理技术</h4>
+                        <p class="mb-3">选择以下技术处理语音输入输出：</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div class="p-4 bg-dark/50 rounded border border-neon-blue/30 hover:border-neon-blue/60 transition-colors">
+                                <h5 class="font-medium text-neon-blue mb-2">Dolphin</h5>
+                                <p class="text-sm mb-2">作为主要语音识别模型，支持东方40语种和22种中文方言</p>
+                                <div class="text-xs text-light-gray/70">选择理由：在中文方言识别方面表现优异，WER比Whisper同等尺寸模型低63.1%</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-blue/30 hover:border-neon-blue/60 transition-colors">
+                                <h5 class="font-medium text-neon-blue mb-2">GPT-4o Transcribe</h5>
+                                <p class="text-sm mb-2">用于高性能语音转文本任务</p>
+                                <div class="text-xs text-light-gray/70">选择理由：提供了与贾维斯类似的自然语音交互体验</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-blue/30 hover:border-neon-blue/60 transition-colors">
+                                <h5 class="font-medium text-neon-blue mb-2">GPT-4o-mini-tts</h5>
+                                <p class="text-sm mb-2">用于文本转语音，提供自然流畅的语音输出</p>
+                                <div class="text-xs text-light-gray/70">选择理由：生成的语音自然流畅，支持情感和风格控制</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-blue/30 hover:border-neon-blue/60 transition-colors">
+                                <h5 class="font-medium text-neon-blue mb-2">听脑AI</h5>
+                                <p class="text-sm mb-2">支持实时翻译和高噪声环境下的语音识别</p>
+                                <div class="text-xs text-light-gray/70">选择理由：DeepSeek-R1技术在高噪声环境下仍能保持高准确率</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 视觉处理技术 -->
+                    <div class="mb-6">
+                        <h4 class="text-lg font-medium text-neon-green mb-3">1.2.4 视觉处理技术</h4>
+                        <p class="mb-3">选择以下技术处理视觉输入：</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="p-4 bg-dark/50 rounded border border-neon-green/30 hover:border-neon-green/60 transition-colors">
+                                <h5 class="font-medium text-neon-green mb-2">ArcMuse 2025 V1.1</h5>
+                                <p class="text-sm mb-2">作为主要视觉处理模型，支持高分辨率图像处理</p>
+                                <div class="text-xs text-light-gray/70">选择理由：在视觉生成和处理方面具有高效性和高质量</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-green/30 hover:border-neon-green/60 transition-colors">
+                                <h5 class="font-medium text-neon-green mb-2">ReVPT</h5>
+                                <p class="text-sm mb-2">用于视觉工具使用，主动选择和使用外部工具解决复杂视觉问题</p>
+                                <div class="text-xs text-light-gray/70">选择理由：使AI能够像人类一样使用视觉工具，增强环境交互能力</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-green/30 hover:border-neon-green/60 transition-colors">
+                                <h5 class="font-medium text-neon-green mb-2">LightField Prior (LFP)</h5>
+                                <p class="text-sm mb-2">用于单图生成全视角图像，增强环境感知能力</p>
+                                <div class="text-xs text-light-gray/70">选择理由：可以从单张图像生成全视角图像，提升环境理解能力</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 多模态融合技术 -->
+                    <div>
+                        <h4 class="text-lg font-medium text-neon-green mb-3">1.2.5 多模态融合技术</h4>
+                        <p class="mb-3">选择以下技术实现多模态融合：</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">I2MoE</h5>
+                                <p class="text-sm mb-2">用于显式建模多模态之间的不同交互类型</p>
+                                <div class="text-xs text-light-gray/70">选择理由：能够增强模态融合，并提供局部和全局层面的解释能力</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">Qwen VLo</h5>
+                                <p class="text-sm mb-2">首次在统一架构中实现视觉理解与生成能力的协同进化</p>
+                                <div class="text-xs text-light-gray/70">选择理由：实现了"理解-生成"的协同进化，非常适合贾维斯的多模态交互需求</div>
+                            </div>
+                            <div class="p-4 bg-dark/50 rounded border border-neon-purple/30 hover:border-neon-purple/60 transition-colors">
+                                <h5 class="font-medium text-neon-purple mb-2">Lumina-DiMOO</h5>
+                                <p class="text-sm mb-2">多模态生成理解统一扩散大模型</p>
+                                <div class="text-xs text-light-gray/70">选择理由：在多模态生成与理解方面表现优异，支持多种任务</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统架构 -->
+                <div id="system-arch" class="bg-dark-blue/30 border border-neon-blue/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-blue/50">
+                    <h3 class="text-xl font-semibold text-neon-blue mb-4">1.3 系统架构设计</h3>
+                    <p class="mb-4">
+                        贾维斯助手采用分层架构设计，从下到上分为基础设施层、核心能力层、功能模块层和应用接口层：
+                    </p>
+                    
+                    <div class="relative py-8 px-4 mb-6">
+                        <!-- 架构可视化 -->
+                        <div class="max-w-3xl mx-auto">
+                            <!-- 应用接口层 -->
+                            <div class="mb-4 p-4 bg-neon-blue/10 border border-neon-blue/30 rounded-lg">
+                                <h4 class="text-neon-blue font-medium mb-2">应用接口层</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                    <div class="p-2 bg-dark/50 rounded text-center">语音交互接口</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">文本交互接口</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">视觉交互接口</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">设备控制接口</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 功能模块层 -->
+                            <div class="mb-4 p-4 bg-neon-purple/10 border border-neon-purple/30 rounded-lg">
+                                <h4 class="text-neon-purple font-medium mb-2">功能模块层</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                    <div class="p-2 bg-dark/50 rounded text-center">自然语言处理</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">环境感知</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">任务管理</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">设备控制</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">数据分析</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">学习与记忆</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 核心能力层 -->
+                            <div class="mb-4 p-4 bg-neon-green/10 border border-neon-green/30 rounded-lg">
+                                <h4 class="text-neon-green font-medium mb-2">核心能力层</h4>
+                                <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <div class="p-2 bg-dark/50 rounded text-center">大语言模型(CrewAI/LangChain)</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">多模态融合引擎(I2MoE/Qwen VLo)</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">智能体协作框架(CrewAI/AutoGen)</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">工具集成系统(FastbuildAI)</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 基础设施层 -->
+                            <div class="p-4 bg-neon-pink/10 border border-neon-pink/30 rounded-lg">
+                                <h4 class="text-neon-pink font-medium mb-2">基础设施层</h4>
+                                <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <div class="p-2 bg-dark/50 rounded text-center">计算资源(CPU/GPU集群)</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">存储系统(数据库/向量数据库)</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">网络设施</div>
+                                    <div class="p-2 bg-dark/50 rounded text-center">开发工具链</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>应用接口层
+├─ 语音交互接口
+├─ 文本交互接口
+├─ 视觉交互接口
+└─ 设备控制接口
+功能模块层
+├─ 自然语言处理模块
+├─ 环境感知模块
+├─ 任务管理模块
+├─ 设备控制模块
+├─ 数据分析模块
+└─ 学习与记忆模块
+核心能力层
+├─ 大语言模型(CrewAI/LangChain)
+├─ 多模态融合引擎(I2MoE/Qwen VLo)
+├─ 智能体协作框架(CrewAI/AutoGen)
+└─ 工具集成系统(FastbuildAI)
+基础设施层
+├─ 计算资源(CPU/GPU集群)
+├─ 存储系统(数据库/向量数据库)
+├─ 网络设施
+└─ 开发工具链</code></pre>
+                        <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                            <i class="fa fa-copy mr-1"></i>复制代码
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 开发计划 -->
+            <section id="schedule" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-purple/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-calendar text-neon-purple"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">二、开发计划与时间表</h2>
+                </div>
+
+                <!-- 开发时间线图表 -->
+                <div class="mb-10 bg-dark-blue/30 border border-neon-purple/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-purple/50">
+                    <h3 class="text-xl font-semibold text-neon-purple mb-4">开发阶段概览</h3>
+                    <div class="h-80 mb-6">
+                        <canvas id="developmentTimeline"></canvas>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div class="p-3 bg-neon-blue/10 border border-neon-blue/30 rounded-lg text-center">
+                            <div class="text-neon-blue font-bold mb-1">阶段1</div>
+                            <div class="text-xs mb-2">第1-4周</div>
+                            <div class="text-sm">基础架构搭建</div>
+                        </div>
+                        <div class="p-3 bg-neon-green/10 border border-neon-green/30 rounded-lg text-center">
+                            <div class="text-neon-green font-bold mb-1">阶段2</div>
+                            <div class="text-xs mb-2">第5-8周</div>
+                            <div class="text-sm">核心功能开发</div>
+                        </div>
+                        <div class="p-3 bg-neon-purple/10 border border-neon-purple/30 rounded-lg text-center">
+                            <div class="text-neon-purple font-bold mb-1">阶段3</div>
+                            <div class="text-xs mb-2">第9-12周</div>
+                            <div class="text-sm">高级功能开发</div>
+                        </div>
+                        <div class="p-3 bg-neon-pink/10 border border-neon-pink/30 rounded-lg text-center">
+                            <div class="text-neon-pink font-bold mb-1">阶段4</div>
+                            <div class="text-xs mb-2">第13-16周</div>
+                            <div class="text-sm">系统优化完善</div>
+                        </div>
+                        <div class="p-3 bg-neon-yellow/10 border border-neon-yellow/30 rounded-lg text-center">
+                            <div class="text-neon-yellow font-bold mb-1">阶段5</div>
+                            <div class="text-xs mb-2">第17-20周</div>
+                            <div class="text-sm">部署与维护</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第一阶段 -->
+                <div id="phase1" class="mb-10 bg-dark-blue/30 border border-neon-blue/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-blue/50">
+                    <h3 class="text-xl font-semibold text-neon-blue mb-4">2.1 第一阶段：基础架构搭建（第1-4周）</h3>
+                    
+                    <div class="space-y-6">
+                        <!-- 第1周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-blue/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-blue font-bold">1</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第1周：环境搭建与框架选择</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">完成开发环境搭建，确定核心框架和技术栈</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">任务列表：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-2">
+                                    <li>
+                                        <span class="font-medium text-white">搭建开发环境</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>配置Python开发环境(3.12版本)</li>
+                                            <li>安装必要的开发工具和库</li>
+                                            <li>配置版本控制系统(Git)</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">选择和评估核心框架</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>评估CrewAI、LangChain、FastbuildAI等框架</li>
+                                            <li>确定主框架和辅助框架</li>
+                                            <li>编写框架选择报告</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">初始化项目结构</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>创建项目目录结构</li>
+                                            <li>设置基本配置文件</li>
+                                            <li>建立初始代码库</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发环境配置文档</li>
+                                    <li>框架选择评估报告</li>
+                                    <li>初始项目结构</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第2周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-blue/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-blue font-bold">2</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第2周：核心框架集成与基础功能开发</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">完成核心框架的集成，实现基础功能模块</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">任务列表：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-2">
+                                    <li>
+                                        <span class="font-medium text-white">集成CrewAI框架</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>实现基本智能体结构</li>
+                                            <li>测试智能体间通信</li>
+                                            <li>编写框架集成文档</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">集成LangChain工具链</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>实现工具调用功能</li>
+                                            <li>测试基本工具链</li>
+                                            <li>建立工具库基础结构</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">开发基础对话系统</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>实现文本输入输出功能</li>
+                                            <li>建立基本对话流程</li>
+                                            <li>实现简单问答功能</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>CrewAI框架集成文档</li>
+                                    <li>LangChain工具链测试报告</li>
+                                    <li>基础对话系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第3周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-blue/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-blue font-bold">3</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第3周：多模态输入输出系统开发</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现语音和文本的双向交互能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">任务列表：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-2">
+                                    <li>
+                                        <span class="font-medium text-white">开发语音识别模块</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>集成Dolphin语音识别模型</li>
+                                            <li>实现实时语音转文本功能</li>
+                                            <li>测试不同环境下的识别效果</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">开发文本转语音模块</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>集成GPT-4o-mini-tts模型</li>
+                                            <li>实现自然流畅的语音合成</li>
+                                            <li>支持语音风格和情感控制</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">实现多模态交互接口</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>整合语音和文本输入输出</li>
+                                            <li>建立统一的交互处理流程</li>
+                                            <li>实现基本的多轮对话管理</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>语音识别模块测试报告</li>
+                                    <li>文本转语音模块测试报告</li>
+                                    <li>多模态交互接口文档</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第4周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-blue/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-blue font-bold">4</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第4周：基础知识库与学习能力开发</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">建立基础知识库和学习能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">任务列表：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-2">
+                                    <li>
+                                        <span class="font-medium text-white">开发基础知识库系统</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>选择和集成向量数据库</li>
+                                            <li>实现知识存储和检索功能</li>
+                                            <li>建立初始知识库内容</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">实现基本学习能力</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>建立用户偏好学习机制</li>
+                                            <li>实现简单的知识更新功能</li>
+                                            <li>测试学习效果</li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        <span class="font-medium text-white">开发记忆管理系统</span>
+                                        <ul class="list-circle pl-5 text-sm mt-1">
+                                            <li>实现对话历史记忆</li>
+                                            <li>建立上下文管理机制</li>
+                                            <li>测试记忆检索功能</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>知识库系统设计文档</li>
+                                    <li>学习能力测试报告</li>
+                                    <li>记忆管理系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第二阶段 -->
+                <div id="phase2" class="mb-10 bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">2.2 第二阶段：核心功能开发（第5-8周）</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 第5周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-green/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-green font-bold">5</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第5周：自然语言理解与生成</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现高级自然语言理解和生成能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发意图识别系统</li>
+                                    <li>开发对话管理系统</li>
+                                    <li>开发自然语言生成系统</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>意图识别系统测试报告</li>
+                                    <li>对话管理系统设计文档</li>
+                                    <li>自然语言生成系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第6周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-green/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-green font-bold">6</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第6周：环境感知与视觉处理</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现环境感知和视觉处理能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发视觉输入处理模块</li>
+                                    <li>开发环境分析模块</li>
+                                    <li>开发视觉跟踪模块</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>视觉处理模块测试报告</li>
+                                    <li>环境分析模块设计文档</li>
+                                    <li>视觉跟踪模块原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第7周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-green/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-green font-bold">7</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第7周：任务管理与执行系统</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现任务管理和执行能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发任务分解系统</li>
+                                    <li>开发任务调度系统</li>
+                                    <li>开发任务执行系统</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>任务分解系统测试报告</li>
+                                    <li>任务调度系统设计文档</li>
+                                    <li>任务执行系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第8周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-green/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-green font-bold">8</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第8周：设备控制与远程管理</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现设备控制和远程管理能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发设备控制协议集成</li>
+                                    <li>开发远程管理系统</li>
+                                    <li>开发自动化执行系统</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>设备控制协议集成报告</li>
+                                    <li>远程管理系统设计文档</li>
+                                    <li>自动化执行系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第三阶段 -->
+                <div id="phase3" class="mb-10 bg-dark-blue/30 border border-neon-purple/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-purple/50">
+                    <h3 class="text-xl font-semibold text-neon-purple mb-4">2.3 第三阶段：高级功能开发（第9-12周）</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 第9周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-purple/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-purple font-bold">9</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第9周：多模态融合与智能决策</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现多模态融合和智能决策能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发多模态融合引擎</li>
+                                    <li>开发智能决策系统</li>
+                                    <li>开发上下文理解系统</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>多模态融合引擎测试报告</li>
+                                    <li>智能决策系统设计文档</li>
+                                    <li>上下文理解系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第10周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-purple/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-purple font-bold">10</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第10周：知识库增强与学习能力提升</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">增强知识库和提升学习能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发知识图谱系统</li>
+                                    <li>开发深度学习能力</li>
+                                    <li>开发个性化推荐系统</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>知识图谱系统设计文档</li>
+                                    <li>深度学习能力测试报告</li>
+                                    <li>个性化推荐系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第11周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-purple/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-purple font-bold">11</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第11周：实时数据分析与处理</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">实现实时数据分析和处理能力</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发数据采集系统</li>
+                                    <li>开发实时数据处理系统</li>
+                                    <li>开发数据分析模型</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>数据采集系统设计文档</li>
+                                    <li>实时数据处理系统测试报告</li>
+                                    <li>数据分析模型原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第12周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-purple/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-purple font-bold">12</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第12周：系统集成与初步测试</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">完成系统集成和初步测试</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>系统整体集成</li>
+                                    <li>初步系统测试</li>
+                                    <li>编写系统文档</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>系统集成报告</li>
+                                    <li>初步测试报告</li>
+                                    <li>系统技术文档</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第四阶段 -->
+                <div id="phase4" class="mb-10 bg-dark-blue/30 border border-neon-pink/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-pink/50">
+                    <h3 class="text-xl font-semibold text-neon-pink mb-4">2.4 第四阶段：系统优化与完善（第13-16周）</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 第13周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-pink/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-pink font-bold">13</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第13周：性能优化与资源管理</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">优化系统性能，提高资源利用效率</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>系统性能分析</li>
+                                    <li>代码优化</li>
+                                    <li>资源管理系统开发</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>系统性能分析报告</li>
+                                    <li>代码优化方案</li>
+                                    <li>资源管理系统原型</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第14周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-pink/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-pink font-bold">14</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第14周：可靠性与稳定性增强</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">增强系统的可靠性和稳定性</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>错误处理机制完善</li>
+                                    <li>系统监控系统开发</li>
+                                    <li>容错与冗余设计</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>错误处理机制设计文档</li>
+                                    <li>系统监控系统测试报告</li>
+                                    <li>容错与冗余设计方案</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第15周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-pink/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-pink font-bold">15</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第15周：用户体验优化与个性化定制</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">优化用户体验，实现个性化定制</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>交互流程优化</li>
+                                    <li>个性化设置开发</li>
+                                    <li>多语言支持开发</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>交互流程优化报告</li>
+                                    <li>个性化设置系统设计文档</li>
+                                    <li>多语言支持测试报告</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第16周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-pink/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-pink font-bold">16</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第16周：全面测试与系统评估</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">目标：</h5>
+                                <p class="text-sm">完成系统全面测试和评估</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-blue font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>功能测试</li>
+                                    <li>性能测试</li>
+                                    <li>系统评估</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-blue font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>全面功能测试报告</li>
+                                    <li>系统性能测试报告</li>
+                                    <li>系统评估报告</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第五阶段 -->
+                <div id="phase5" class="bg-dark-blue/30 border border-neon-yellow/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-yellow/50">
+                    <h3 class="text-xl font-semibold text-neon-yellow mb-4">2.5 第五阶段：部署与维护（第17-20周）</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- 第17周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-yellow/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-yellow font-bold">17</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第17周：部署环境准备</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">准备系统部署环境</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>部署环境评估</li>
+                                    <li>打包和分发系统</li>
+                                    <li>部署文档编写</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>部署环境评估报告</li>
+                                    <li>系统安装包</li>
+                                    <li>部署和维护文档</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第18周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-yellow/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-yellow font-bold">18</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第18周：系统部署与上线</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">完成系统部署和上线</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>部署系统</li>
+                                    <li>系统初始化</li>
+                                    <li>上线测试</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>系统部署报告</li>
+                                    <li>上线测试报告</li>
+                                    <li>系统运行日志</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第19周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-yellow/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-yellow font-bold">19</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第19周：用户培训与支持</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">培训用户，提供系统支持</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>开发培训材料</li>
+                                    <li>开展用户培训</li>
+                                    <li>建立支持系统</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>用户培训材料</li>
+                                    <li>培训反馈报告</li>
+                                    <li>系统支持文档</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <!-- 第20周 -->
+                        <div class="p-4 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <div class="flex items-center mb-3">
+                                <div class="w-8 h-8 rounded-full bg-neon-yellow/20 flex items-center justify-center mr-2">
+                                    <span class="text-neon-yellow font-bold">20</span>
+                                </div>
+                                <h4 class="text-lg font-medium text-white">第20周：系统维护与持续改进</h4>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">目标：</h5>
+                                <p class="text-sm">建立系统维护机制，持续改进系统</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">关键任务：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>建立维护计划</li>
+                                    <li>收集用户反馈</li>
+                                    <li>制定改进计划</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">关键交付物：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>系统维护计划</li>
+                                    <li>用户反馈分析报告</li>
+                                    <li>系统改进路线图</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 核心功能详细设计 -->
+            <section id="features" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-green/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-cogs text-neon-green"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">三、核心功能详细设计</h2>
+                </div>
+
+                <!-- 自然语言交互系统 -->
+                <div id="nlp-system" class="mb-10 bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">3.1 自然语言交互系统</h3>
+                    <p class="mb-4">
+                        自然语言交互系统是贾维斯助手的核心功能之一，实现与用户的语音和文本交互。该系统主要包括以下子系统：
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- 语音识别与合成模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.1.1 语音识别与合成模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">将用户的语音输入转换为文本，并将系统的文本输出转换为自然流畅的语音。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>语音识别：使用Dolphin语音识别模型，支持东方40语种和22种中文方言，WER比Whisper同等尺寸模型低63.1%</li>
+                                    <li>语音合成：使用GPT-4o-mini-tts模型，支持情感和风格控制，生成自然流畅的语音</li>
+                                    <li>语音增强：集成听脑AI的DeepSeek-R1技术，提高在高噪声环境下的识别准确率</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>语音输入通过麦克风采集</li>
+                                    <li>语音信号预处理（降噪、增益等）</li>
+                                    <li>语音识别为文本</li>
+                                    <li>文本处理和理解</li>
+                                    <li>生成响应文本</li>
+                                    <li>文本转换为语音</li>
+                                    <li>语音输出通过扬声器播放</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <!-- 自然语言理解模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.1.2 自然语言理解模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">理解用户输入的文本内容，识别意图、实体和关系，建立上下文理解。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>意图识别：使用基于CrewAI的多智能体系统，实现意图分类和槽位填充</li>
+                                    <li>实体识别：结合LangChain的实体提取工具和自定义规则</li>
+                                    <li>上下文管理：使用LangGraph框架实现有状态的对话管理</li>
+                                    <li>语义理解：集成Qwen2.5-VL多模态大语言模型，实现深度语义理解</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>接收输入文本</li>
+                                    <li>分词和词性标注</li>
+                                    <li>意图识别和分类</li>
+                                    <li>实体提取和分类</li>
+                                    <li>上下文信息整合</li>
+                                    <li>语义理解和表示</li>
+                                    <li>生成内部表示供后续处理</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <!-- 对话管理模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.1.3 对话管理模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">管理对话流程，维护对话状态，控制对话流程，生成适当的响应。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>对话状态跟踪：使用Rasa框架的对话状态跟踪技术</li>
+                                    <li>对话策略：基于规则和机器学习的混合策略</li>
+                                    <li>对话流程控制：使用CrewAI的角色化智能体编排机制</li>
+                                    <li>多轮对话管理：集成LangGraph的状态管理功能，实现长对话上下文保持</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>更新对话状态</li>
+                                    <li>根据当前状态和用户输入确定下一步行动</li>
+                                    <li>调用相应的功能模块处理</li>
+                                    <li>生成响应文本</li>
+                                    <li>更新对话历史</li>
+                                    <li>确定是否结束对话或继续</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <!-- 自然语言生成模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.1.4 自然语言生成模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">根据系统的内部表示生成自然流畅的文本响应。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>文本生成模型：使用Qwen2.5-VL和Phi-4-Multimodal模型，生成高质量文本</li>
+                                    <li>模板生成：基于模板的响应生成，确保特定场景下的准确响应</li>
+                                    <li>修辞和风格控制：根据用户偏好和对话场景调整生成文本的风格</li>
+                                    <li>多语言支持：集成Claude 3.5模型，支持多语言生成</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>接收系统内部表示</li>
+                                    <li>确定响应类型和结构</li>
+                                    <li>生成初步文本</li>
+                                    <li>调整文本风格和语气</li>
+                                    <li>进行语法和拼写检查</li>
+                                    <li>生成最终响应文本</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 自然语言交互系统流程图 -->
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">自然语言交互系统整体流程</h4>
+                        <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-2 text-sm">
+                            <div class="flex flex-col items-center p-3 bg-neon-blue/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-microphone text-neon-blue text-2xl mb-2"></i>
+                                <div class="text-center">语音输入</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-blue/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-volume-up text-neon-blue text-2xl mb-2"></i>
+                                <div class="text-center">语音识别</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-purple/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-comments text-neon-purple text-2xl mb-2"></i>
+                                <div class="text-center">自然语言理解</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-purple/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-sitemap text-neon-purple text-2xl mb-2"></i>
+                                <div class="text-center">对话管理</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-green/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-pencil text-neon-green text-2xl mb-2"></i>
+                                <div class="text-center">自然语言生成</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-green/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-volume-down text-neon-green text-2xl mb-2"></i>
+                                <div class="text-center">语音合成</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 环境感知系统 -->
+                <div id="env-perception" class="mb-10 bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">3.2 环境感知系统</h3>
+                    <p class="mb-4">
+                        环境感知系统使贾维斯能够感知物理环境，获取视觉和听觉信息，实现环境理解和交互。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- 视觉感知模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.2.1 视觉感知模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">处理视觉输入，识别物体、场景和动作，理解环境信息。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>图像处理：使用ArcMuse 2025 V1.1模型，支持高分辨率图像处理和生成</li>
+                                    <li>物体识别：集成ReVPT视觉工具使用系统，主动选择和使用视觉工具解决复杂问题</li>
+                                    <li>场景理解：使用LightField Prior技术，从单张图像生成全视角图像，增强场景理解</li>
+                                    <li>视觉跟踪：实现多目标跟踪和行为分析</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>图像输入通过摄像头采集</li>
+                                    <li>图像预处理（降噪、增强等）</li>
+                                    <li>物体检测和识别</li>
+                                    <li>场景分析和理解</li>
+                                    <li>目标跟踪和行为分析</li>
+                                    <li>生成环境描述和内部表示</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <!-- 听觉感知模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.2.2 听觉感知模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">处理环境声音，识别声音来源和类型，实现声音事件检测。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>声音识别：使用Dolphin语音识别模型，支持声音事件检测</li>
+                                    <li>声源定位：实现声音来源的空间定位</li>
+                                    <li>环境声音分析：识别环境声音类型（如音乐、警报、自然声音等）</li>
+                                    <li>异常声音检测：检测异常声音并触发相应处理</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>声音输入通过麦克风采集</li>
+                                    <li>声音信号预处理</li>
+                                    <li>声音分类和识别</li>
+                                    <li>声源定位和跟踪</li>
+                                    <li>异常声音检测</li>
+                                    <li>生成声音描述和内部表示</li>
+                                </ol>
+                            </div>
+                        </div>
+                        
+                        <!-- 多模态融合模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.2.3 多模态融合模块</h4>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">融合视觉、听觉和其他传感器信息，实现更全面的环境感知和理解。</p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>多模态融合：使用I2MoE框架显式建模多模态之间的交互类型</li>
+                                    <li>信息关联：建立不同模态信息之间的关联关系</li>
+                                    <li>环境建模：基于多模态信息构建环境模型</li>
+                                    <li>决策支持：为决策系统提供多模态环境信息支持</li>
+                                </ul>
+                            </div>
+                            
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>接收来自不同模态的输入</li>
+                                    <li>进行模态内处理和特征提取</li>
+                                    <li>多模态特征融合</li>
+                                    <li>环境信息整合和关联</li>
+                                    <li>环境模型更新和维护</li>
+                                    <li>提供环境信息给其他模块</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 环境感知系统示意图 -->
+        <!-- 环境感知系统示意图 -->
+<div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20 mb-8">
+    <h4 class="text-lg font-medium text-neon-blue mb-3">环境感知系统数据流向</h4>
+    <div class="relative py-8">
+        <!-- 传感器输入 -->
+        <div class="flex justify-around mb-8">
+            <div class="flex flex-col items-center">
+                <div class="w-16 h-16 rounded-full bg-neon-blue/20 flex items-center justify-center mb-2">
+                    <i class="fa fa-video-camera text-neon-blue text-2xl"></i>
+                </div>
+                <div class="text-center text-sm text-light-gray">摄像头<br>(图像采集)</div>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-16 h-16 rounded-full bg-neon-purple/20 flex items-center justify-center mb-2">
+                    <i class="fa fa-microphone text-neon-purple text-2xl"></i>
+                </div>
+                <div class="text-center text-sm text-light-gray">麦克风<br>(声音采集)</div>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-16 h-16 rounded-full bg-neon-green/20 flex items-center justify-center mb-2">
+                    <i class="fa fa-thermometer-half text-neon-green text-2xl"></i>
+                </div>
+                <div class="text-center text-sm text-light-gray">传感器<br>(温湿度/ motion)</div>
+            </div>
+        </div>
+
+        <!-- 数据流向箭头1：传感器 → 预处理模块 -->
+        <div class="flex justify-center mb-1">
+            <i class="fa fa-long-arrow-down text-neon-blue/50 text-2xl"></i>
+        </div>
+
+        <!-- 预处理模块 -->
+        <div class="flex justify-center mb-8">
+            <div class="w-48 h-16 border-2 border-neon-blue/50 rounded-lg flex items-center justify-center bg-dark/80">
+                <div class="text-center">
+                    <div class="text-neon-blue text-sm font-medium">数据预处理模块</div>
+                    <div class="text-light-gray/70 text-xs mt-1">降噪/格式统一/特征提取</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据流向箭头2：预处理 → 多模态融合 -->
+        <div class="flex justify-center mb-1">
+            <i class="fa fa-long-arrow-down text-neon-purple/50 text-2xl"></i>
+        </div>
+
+        <!-- 多模态融合引擎 -->
+        <div class="flex justify-center mb-8">
+            <div class="w-64 h-20 border-2 border-neon-purple/50 rounded-lg flex items-center justify-center bg-dark/80 relative">
+                <!-- 融合特效标记 -->
+                <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-12 h-6 bg-neon-purple/30 rounded-full flex items-center justify-center">
+                    <span class="text-xs text-neon-purple font-medium">I2MoE 引擎</span>
+                </div>
+                <div class="text-center">
+                    <div class="text-neon-purple text-sm font-medium">多模态融合引擎</div>
+                    <div class="text-light-gray/70 text-xs mt-1">图像/声音/传感器数据关联融合</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据流向箭头3：多模态融合 → 分析模块（分支） -->
+        <div class="flex justify-around mb-6">
+            <div class="flex flex-col items-center">
+                <i class="fa fa-long-arrow-down text-neon-green/50 text-2xl mb-1"></i>
+                <div class="w-36 h-14 border-2 border-neon-green/50 rounded-lg flex items-center justify-center bg-dark/80">
+                    <div class="text-center">
+                        <div class="text-neon-green text-sm font-medium">场景分析</div>
+                        <div class="text-light-gray/70 text-xs">实验室/家居/户外</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col items-center">
+                <i class="fa fa-long-arrow-down text-neon-yellow/50 text-2xl mb-1"></i>
+                <div class="w-36 h-14 border-2 border-neon-yellow/50 rounded-lg flex items-center justify-center bg-dark/80">
+                    <div class="text-center">
+                        <div class="text-neon-yellow text-sm font-medium">目标识别</div>
+                        <div class="text-light-gray/70 text-xs">设备/人员/异常物体</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col items-center">
+                <i class="fa fa-long-arrow-down text-neon-red/50 text-2xl mb-1"></i>
+                <div class="w-36 h-14 border-2 border-neon-red/50 rounded-lg flex items-center justify-center bg-dark/80">
+                    <div class="text-center">
+                        <div class="text-neon-red text-sm font-medium">异常检测</div>
+                        <div class="text-light-gray/70 text-xs">设备故障/入侵/异响</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据流向箭头4：分析模块 → 结果输出 -->
+        <div class="flex justify-center mt-2">
+            <div class="w-80 h-1 bg-gradient-to-r from-neon-green/30 via-neon-yellow/30 to-neon-red/30 rounded-full"></div>
+        </div>
+        <div class="flex justify-center mt-4">
+            <div class="w-56 h-14 border-2 border-white/30 rounded-lg flex items-center justify-center bg-dark/80">
+                <div class="text-center">
+                    <div class="text-white text-sm font-medium">环境感知结果输出</div>
+                    <div class="text-light-gray/70 text-xs">对接任务管理/设备控制模块</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 环境感知系统核心参数 -->
+<div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+    <h4 class="text-lg font-medium text-neon-blue mb-3">核心性能参数</h4>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="border border-neon-blue/30 rounded-lg p-3">
+            <div class="flex items-center mb-2">
+                <i class="fa fa-image text-neon-blue mr-2"></i>
+                <h5 class="text-sm font-medium text-neon-blue">图像识别能力</h5>
+            </div>
+            <ul class="text-xs text-light-gray space-y-1">
+                <li>• 支持最大3840×1506分辨率</li>
+                <li>• 实验室设备识别准确率94%</li>
+                <li>• 物体检测延迟＜200ms</li>
+            </ul>
+        </div>
+        <div class="border border-neon-purple/30 rounded-lg p-3">
+            <div class="flex items-center mb-2">
+                <i class="fa fa-volume-up text-neon-purple mr-2"></i>
+                <h5 class="text-sm font-medium text-neon-purple">声音处理能力</h5>
+            </div>
+            <ul class="text-xs text-light-gray space-y-1">
+                <li>• 支持40种语言+22种方言</li>
+                <li>• 高噪声环境识别准确率91%</li>
+                <li>• 异响检测响应时间＜150ms</li>
+            </ul>
+        </div>
+        <div class="border border-neon-green/30 rounded-lg p-3">
+            <div class="flex items-center mb-2">
+                <i class="fa fa-bolt text-neon-green mr-2"></i>
+                <h5 class="text-sm font-medium text-neon-green">系统运行效率</h5>
+            </div>
+            <ul class="text-xs text-light-gray space-y-1">
+                <li>• 多模态数据融合耗时＜300ms</li>
+                <li>• 边缘设备占用内存＜8GB</li>
+                <li>• 连续运行稳定性＞99.5%</li>
+            </ul>
+        </div>
+    </div>
+</div>
+                </div>
+            </section>
+        </main>
+    </div></body>
