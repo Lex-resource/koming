@@ -1,4 +1,6 @@
 from langchain.tools import tool
+from jarvis.core.audit_logger import audit_logger, OperationType
+from jarvis.core.data_store import data_store, DataCategory
 
 
 class DeviceTool:
@@ -22,10 +24,18 @@ class DeviceTool:
         Returns:
             操作结果
         """
+        original_device = device
         device = device.replace("灯", "灯光").replace("空调", "空调")
         
         if device not in DeviceTool._devices:
-            return f"未知设备: {device}"
+            audit_logger.log_operation(
+                operation_type=OperationType.TOOL_USE,
+                agent_name="执行者",
+                action="control_device",
+                details={"device": original_device, "action": action, "parameter": parameter},
+                result="失败: 未知设备"
+            )
+            return f"未知设备: {original_device}"
         
         action_map = {
             "on": "on", "打开": "on", "开启": "on",
@@ -33,42 +43,60 @@ class DeviceTool:
         }
         
         normalized_action = action_map.get(action, action)
+        result_text = ""
         
         if normalized_action in ["on", "off"]:
             DeviceTool._devices[device]["status"] = normalized_action
             status_text = "已开启" if normalized_action == "on" else "已关闭"
-            return f"{status_text} {device}"
+            result_text = f"{status_text} {device}"
         
         elif normalized_action == "调节":
             if device == "空调" and parameter:
                 try:
                     temp = int(parameter)
                     DeviceTool._devices[device]["temperature"] = temp
-                    return f"空调温度已调节至 {temp}°C"
+                    result_text = f"空调温度已调节至 {temp}°C"
                 except ValueError:
-                    return "温度参数无效"
+                    result_text = "温度参数无效"
             
             elif device == "灯光" and parameter:
                 try:
                     brightness = int(parameter)
                     DeviceTool._devices[device]["brightness"] = max(0, min(100, brightness))
-                    return f"灯光亮度已调节至 {brightness}%"
+                    result_text = f"灯光亮度已调节至 {brightness}%"
                 except ValueError:
-                    return "亮度参数无效"
+                    result_text = "亮度参数无效"
             
             elif device == "音乐" and parameter:
                 try:
                     volume = int(parameter)
                     DeviceTool._devices[device]["volume"] = max(0, min(100, volume))
-                    return f"音乐音量已调节至 {volume}%"
+                    result_text = f"音乐音量已调节至 {volume}%"
                 except ValueError:
-                    return "音量参数无效"
+                    result_text = "音量参数无效"
             
             else:
-                return f"{device}不支持此参数调节"
+                result_text = f"{device}不支持此参数调节"
         
         else:
-            return f"未知操作: {action}"
+            result_text = f"未知操作: {action}"
+        
+        audit_logger.log_operation(
+            operation_type=OperationType.TOOL_USE,
+            agent_name="执行者",
+            action="control_device",
+            details={"device": device, "action": action, "parameter": parameter},
+            result=result_text
+        )
+        
+        data_store.add_record(
+            category=DataCategory.DEVICE,
+            source="control_device",
+            content={"device": device, "action": action, "parameter": parameter, "result": result_text, "status": DeviceTool._devices[device].copy()},
+            tags=["设备控制", device]
+        )
+        
+        return result_text
 
     @tool("get_device_status")
     def get_device_status(device: str = None) -> str:
@@ -82,6 +110,7 @@ class DeviceTool:
             设备状态信息
         """
         if device:
+            original_device = device
             device = device.replace("灯", "灯光").replace("空调", "空调")
             if device in DeviceTool._devices:
                 status = DeviceTool._devices[device]
@@ -96,19 +125,53 @@ class DeviceTool:
                         status_str += f"，音量: {status['volume']}%"
                 else:
                     status_str += "已关闭"
+                
+                audit_logger.log_operation(
+                    operation_type=OperationType.DATA_QUERY,
+                    agent_name="执行者",
+                    action="get_device_status",
+                    details={"device": device},
+                    result=status_str
+                )
+                
+                data_store.add_record(
+                    category=DataCategory.DEVICE,
+                    source="get_device_status",
+                    content={"device": device, "status": status.copy()},
+                    tags=["设备状态", device]
+                )
+                
                 return status_str
             else:
-                return f"未知设备: {device}"
+                return f"未知设备: {original_device}"
         
         else:
             result = "当前设备状态:\n"
+            all_status = {}
             for dev, status in DeviceTool._devices.items():
-                result += f"- {dev}: {'开启' if status['status'] == 'on' else '关闭'}"
+                status_str = f"- {dev}: {'开启' if status['status'] == 'on' else '关闭'}"
                 if "temperature" in status:
-                    result += f" ({status['temperature']}°C)"
+                    status_str += f" ({status['temperature']}°C)"
                 elif "brightness" in status:
-                    result += f" ({status['brightness']}%)"
+                    status_str += f" ({status['brightness']}%)"
                 elif "volume" in status:
-                    result += f" ({status['volume']}%)"
-                result += "\n"
+                    status_str += f" ({status['volume']}%)"
+                result += status_str + "\n"
+                all_status[dev] = status.copy()
+            
+            audit_logger.log_operation(
+                operation_type=OperationType.DATA_QUERY,
+                agent_name="执行者",
+                action="get_device_status",
+                details={"device": "all"},
+                result="获取所有设备状态"
+            )
+            
+            data_store.add_record(
+                category=DataCategory.DEVICE,
+                source="get_device_status",
+                content={"device": "all", "status": all_status},
+                tags=["设备状态", "全部"]
+            )
+            
             return result.strip()
