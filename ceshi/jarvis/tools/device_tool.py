@@ -1,6 +1,7 @@
 from langchain.tools import tool
-from jarvis.core.audit_logger import audit_logger, OperationType
-from jarvis.core.data_store import data_store, DataCategory
+from jarvis.core.decorators import audit_and_store
+from jarvis.core.audit_logger import OperationType
+from jarvis.core.data_store import DataCategory
 
 
 class DeviceTool:
@@ -12,6 +13,14 @@ class DeviceTool:
     }
 
     @tool("control_device")
+    @audit_and_store(
+        operation_type=OperationType.TOOL_USE,
+        category=DataCategory.DEVICE,
+        agent_name="执行者",
+        tags=["设备控制"],
+        capture_args=True,
+        capture_result=True
+    )
     def control_device(device: str, action: str, parameter: str = None) -> str:
         """
         控制智能家居设备
@@ -28,13 +37,6 @@ class DeviceTool:
         device = device.replace("灯", "灯光").replace("空调", "空调")
         
         if device not in DeviceTool._devices:
-            audit_logger.log_operation(
-                operation_type=OperationType.TOOL_USE,
-                agent_name="执行者",
-                action="control_device",
-                details={"device": original_device, "action": action, "parameter": parameter},
-                result="失败: 未知设备"
-            )
             return f"未知设备: {original_device}"
         
         action_map = {
@@ -81,24 +83,17 @@ class DeviceTool:
         else:
             result_text = f"未知操作: {action}"
         
-        audit_logger.log_operation(
-            operation_type=OperationType.TOOL_USE,
-            agent_name="执行者",
-            action="control_device",
-            details={"device": device, "action": action, "parameter": parameter},
-            result=result_text
-        )
-        
-        data_store.add_record(
-            category=DataCategory.DEVICE,
-            source="control_device",
-            content={"device": device, "action": action, "parameter": parameter, "result": result_text, "status": DeviceTool._devices[device].copy()},
-            tags=["设备控制", device]
-        )
-        
         return result_text
 
     @tool("get_device_status")
+    @audit_and_store(
+        operation_type=OperationType.DATA_QUERY,
+        category=DataCategory.DEVICE,
+        agent_name="执行者",
+        tags=["设备状态"],
+        capture_args=True,
+        capture_result=True
+    )
     def get_device_status(device: str = None) -> str:
         """
         获取设备状态
@@ -126,28 +121,12 @@ class DeviceTool:
                 else:
                     status_str += "已关闭"
                 
-                audit_logger.log_operation(
-                    operation_type=OperationType.DATA_QUERY,
-                    agent_name="执行者",
-                    action="get_device_status",
-                    details={"device": device},
-                    result=status_str
-                )
-                
-                data_store.add_record(
-                    category=DataCategory.DEVICE,
-                    source="get_device_status",
-                    content={"device": device, "status": status.copy()},
-                    tags=["设备状态", device]
-                )
-                
                 return status_str
             else:
                 return f"未知设备: {original_device}"
         
         else:
             result = "当前设备状态:\n"
-            all_status = {}
             for dev, status in DeviceTool._devices.items():
                 status_str = f"- {dev}: {'开启' if status['status'] == 'on' else '关闭'}"
                 if "temperature" in status:
@@ -157,21 +136,5 @@ class DeviceTool:
                 elif "volume" in status:
                     status_str += f" ({status['volume']}%)"
                 result += status_str + "\n"
-                all_status[dev] = status.copy()
-            
-            audit_logger.log_operation(
-                operation_type=OperationType.DATA_QUERY,
-                agent_name="执行者",
-                action="get_device_status",
-                details={"device": "all"},
-                result="获取所有设备状态"
-            )
-            
-            data_store.add_record(
-                category=DataCategory.DEVICE,
-                source="get_device_status",
-                content={"device": "all", "status": all_status},
-                tags=["设备状态", "全部"]
-            )
             
             return result.strip()

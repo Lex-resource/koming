@@ -14,6 +14,7 @@ from jarvis.core.crew_manager import CrewManager
 from jarvis.core.global_state import global_state
 from jarvis.core.audit_logger import audit_logger, OperationType
 from jarvis.core.data_store import data_store, DataCategory
+from jarvis.core.decorators import audit_and_store
 
 
 def handle_system_command(user_input: str) -> bool:
@@ -107,6 +108,7 @@ def main():
     print("输入 '退出' 或 'quit' 结束对话。")
     print("=" * 70)
 
+    # 加载历史数据
     global_state.load_history()
     audit_logger.load_logs()
     data_store.load_store()
@@ -130,6 +132,8 @@ def main():
                 continue
 
             start_time = datetime.now()
+            
+            # 记录用户输入
             audit_logger.log_operation(
                 operation_type=OperationType.USER_INPUT,
                 user_id=current_user,
@@ -143,6 +147,7 @@ def main():
             
             duration = (datetime.now() - start_time).total_seconds()
             
+            # 记录智能体调用
             audit_logger.log_operation(
                 operation_type=OperationType.AGENT_CALL,
                 user_id=current_user,
@@ -153,6 +158,7 @@ def main():
                 duration=duration
             )
 
+            # 存储对话数据
             data_store.add_record(
                 category=DataCategory.USER_INPUT,
                 source="用户输入",
@@ -161,6 +167,7 @@ def main():
                 tags=["对话", "用户交互"]
             )
             
+            # 更新全局状态
             global_state.add_conversation(user_input, result)
 
         except KeyboardInterrupt:
