@@ -59,6 +59,13 @@ def call_glm45_flash(api_key, in_prompt, temperature=0.7, max_tokens=1024, retry
 
 
 if __name__ == "__main__":
-    API_KEY = "ec16e21437744263b28f8a7243c5e9e2.vZX9qa3hxo0vzwUw"
-    prompt=input()
-    print(call_glm45_flash(API_KEY, prompt)[1])
+    import os
+    API_KEY = os.getenv("GLM_API_KEY")
+    if not API_KEY:
+        raise EnvironmentError("请设置 GLM_API_KEY 环境变量，或在 .env 文件中配置")
+    prompt = input("请输入问题：")
+    _, result, error = call_glm45_flash(API_KEY, prompt)
+    if error:
+        print(f"❌ 错误: {error}")
+    else:
+        print(f"✅ 回复: {result}")
