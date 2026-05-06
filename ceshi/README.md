@@ -12,6 +12,7 @@
 - 👥 **多智能体协作** - 指挥官、分析师、执行者、学习官分工协作
 - 🔒 **审计日志** - 记录所有用户和智能体操作，支持审查追踪
 - 📊 **数据分类存储** - 分门别类存储所有查询数据，支持统计分析
+- 🔧 **装饰器自动记录** - 新增功能自动被审计和存储系统记录
 
 ## 技术栈
 
@@ -47,30 +48,67 @@ GLM_API_KEY=your_glm_api_key_here
 python main.py
 ```
 
-## 项目结构
+### 4. 测试装饰器功能（可选）
+
+```bash
+python tests/test_decorators.py
+```
+
+### 5. 运行示例（可选）
+
+```bash
+python examples/decorator_example.py
+```
+
+## 完整项目结构
 
 ```
-jarvis/
-├── __init__.py
-├── agents/           # 智能体模块
-│   ├── base_agent.py     # 基础智能体类
-│   ├── commander.py      # 指挥官智能体
-│   ├── analyst.py        # 分析师智能体
-│   ├── executor.py       # 执行者智能体
-│   └── learner.py        # 学习官智能体
-├── tools/            # 工具模块
-│   ├── search_tool.py    # 搜索工具
-│   ├── weather_tool.py   # 天气工具
-│   └── device_tool.py    # 设备控制工具
-├── memory/           # 记忆模块
-│   └── memory_manager.py # 记忆管理器
-├── core/             # 核心模块
-│   ├── crew_manager.py   # 团队管理器
-│   ├── global_state.py   # 全局状态管理
-│   ├── audit_logger.py   # 审计日志系统
-│   └── data_store.py     # 数据分类存储
-└── config/           # 配置模块
-    └── settings.py       # 设置类
+ceshi/
+├── jarvis/                    # 核心包
+│   ├── __init__.py            # 包导出模块
+│   ├── agents/                # 智能体模块
+│   │   ├── __init__.py
+│   │   ├── base_agent.py      # 基础智能体类
+│   │   ├── commander.py       # 指挥官智能体
+│   │   ├── analyst.py         # 分析师智能体
+│   │   ├── executor.py        # 执行者智能体
+│   │   └── learner.py         # 学习官智能体
+│   ├── tools/                 # 工具模块
+│   │   ├── __init__.py
+│   │   ├── search_tool.py     # 搜索工具
+│   │   ├── weather_tool.py    # 天气工具
+│   │   └── device_tool.py     # 设备控制工具
+│   ├── memory/                # 记忆模块
+│   │   ├── __init__.py
+│   │   └── memory_manager.py  # 记忆管理器
+│   ├── core/                  # 核心模块
+│   │   ├── audit_logger.py    # 审计日志系统
+│   │   ├── data_store.py      # 数据分类存储
+│   │   ├── decorators.py      # 装饰器（自动记录）
+│   │   ├── global_state.py    # 全局状态管理
+│   │   ├── crew_manager.py    # 团队协作管理
+│   │   └── logger.py          # 日志工具
+│   └── config/                # 配置模块
+│       ├── __init__.py
+│       └── settings.py        # 设置类
+├── tests/                     # 测试目录
+│   ├── __init__.py
+│   └── test_decorators.py     # 装饰器测试
+├── examples/                  # 示例代码
+│   └── decorator_example.py   # 装饰器使用示例
+├── docs/                      # 文档目录
+│   └── DECORATOR_GUIDE.md     # 装饰器使用指南
+├── scripts/                   # 脚本工具目录
+│   └── __init__.py
+├── archive/                   # 归档（旧文件）
+│   └── ai_con.py              # 旧版本API调用文件
+├── data/                      # 数据存储目录
+│   └── .gitkeep               # 目录占位文件
+├── main.py                    # 主程序入口
+├── requirements.txt           # 依赖列表
+├── .env                       # 环境变量（不提交）
+├── .env.example               # 环境变量示例
+└── README.md                  # 项目文档
 ```
 
 ## 系统命令
@@ -138,12 +176,52 @@ jarvis/
 - 支持标签系统，方便分类检索
 - 提供统计功能，支持按分类、来源、标签统计
 
+### 3. 装饰器系统 (`core/decorators.py`)
+- `@audit` - 只记录审计日志
+- `@store_data` - 只存储数据
+- `@audit_and_store` - **推荐** - 同时记录审计日志和存储数据
+- 装饰器自动捕获参数、结果、执行时间，错误也会被记录
+
+**新增功能只需要添加装饰器即可被自动记录：**
+```python
+from jarvis.core.decorators import audit_and_store
+from jarvis.core.audit_logger import OperationType
+from jarvis.core.data_store import DataCategory
+
+@audit_and_store(
+    operation_type=OperationType.TOOL_USE,
+    category=DataCategory.ANALYSIS,
+    agent_name="执行者",
+    tags=["新功能标签"]
+)
+def your_new_function():
+    # 业务逻辑...
+    return result
+```
+
 ## 开发计划
 
 - [x] 基础架构搭建
 - [x] 核心功能开发
 - [x] 审计日志系统
 - [x] 数据分类存储
+- [x] 装饰器自动记录
 - [ ] 多模态交互（语音识别/合成）
 - [ ] 高级功能开发
 - [ ] 系统优化完善
+
+## 目录说明
+
+| 目录 | 用途 |
+|------|------|
+| `jarvis/` | 核心包，包含所有业务逻辑 |
+| `tests/` | 测试代码 |
+| `examples/` | 示例代码 |
+| `docs/` | 项目文档 |
+| `scripts/` | 辅助脚本工具 |
+| `archive/` | 旧文件归档 |
+| `data/` | 数据存储目录 |
+
+## 相关文档
+
+- 装饰器使用指南: [docs/DECORATOR_GUIDE.md](docs/DECORATOR_GUIDE.md)

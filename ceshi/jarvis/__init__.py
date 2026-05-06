@@ -7,6 +7,11 @@ from .tools.search_tool import SearchTool
 from .tools.weather_tool import WeatherTool
 from .tools.device_tool import DeviceTool
 from .memory.memory_manager import MemoryManager
+from .core.audit_logger import audit_logger, OperationType
+from .core.data_store import data_store, DataCategory, DataRecord
+from .core.decorators import audit, store_data, audit_and_store
+from .core.global_state import global_state
+from .core.crew_manager import CrewManager
 
 __all__ = [
     'Settings',
@@ -18,6 +23,16 @@ __all__ = [
     'WeatherTool',
     'DeviceTool',
     'MemoryManager',
+    'audit_logger',
+    'OperationType',
+    'data_store',
+    'DataCategory',
+    'DataRecord',
+    'audit',
+    'store_data',
+    'audit_and_store',
+    'global_state',
+    'CrewManager',
 ]
 
 __version__ = "1.0.0"

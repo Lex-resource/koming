@@ -1,0 +1,4 @@
+# 此目录用于存储数据文件
+# 审计日志: audit_logs.json
+# 数据存储: data_store.json
+# 对话历史: 其他数据文件
