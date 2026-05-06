@@ -1,0 +1,19 @@
+# 核心框架
+langchain==0.2.14
+langchain-community==0.2.12
+crewai==0.38.0
+crewai-tools==0.2.14
+
+# 模型支持
+openai==1.35.10
+
+# 多模态
+pydub==0.25.1
+
+# 工具
+python-dotenv==1.0.1
+requests==2.32.3
+beautifulsoup4==4.12.3
+
+# 记忆与存储
+chromadb==0.5.3
