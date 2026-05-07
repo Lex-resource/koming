@@ -10,7 +10,7 @@ class BaseAgent(Agent):
     def __init__(self, role, goal, backstory, llm: Optional[Any] = None, **kwargs):
         if llm is None:
             llm = self._get_default_llm()
-        
+
         super().__init__(
             role=role,
             goal=goal,

@@ -11,7 +11,7 @@ class ExecutorAgent(BaseAgent):
             WeatherTool(),
             DeviceTool()
         ]
-        
+
         super().__init__(
             role="贾维斯执行者",
             goal="执行具体任务，调用工具完成操作",

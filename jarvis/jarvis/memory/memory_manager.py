@@ -86,7 +86,7 @@ class MemoryManager:
         if self.embeddings:
             return self.embeddings.embed_query(text)
         else:
-            return np.random.rand(self.embedding_dim).tolist()
+            raise RuntimeError("嵌入服务未初始化，请检查OPENAI_API_KEY配置")
 
     def search_memory(self, query: str, top_k: int = 5) -> List[Dict]:
         """极速搜索记忆 - HNSW优化"""

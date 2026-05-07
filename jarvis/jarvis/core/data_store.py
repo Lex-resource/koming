@@ -1,5 +1,7 @@
 import json
 import os
+import asyncio
+import threading
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from enum import Enum
@@ -57,6 +59,32 @@ class DataStore:
         self.records: List[DataRecord] = []
         self._store_file = "./data/data_store.json"
         self._ensure_data_dir()
+        self._lock = threading.Lock()
+        self._write_queue = asyncio.Queue()
+        self._start_async_writer()
+    
+    def _start_async_writer(self):
+        """启动异步写入线程"""
+        self._writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
+        self._writer_thread.start()
+    
+    def _writer_loop(self):
+        """后台写入循环"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._async_write_loop())
+    
+    async def _async_write_loop(self):
+        """异步写入循环"""
+        while True:
+            records = await self._write_queue.get()
+            try:
+                data = [r.to_dict() for r in records]
+                with open(self._store_file, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                print(f"保存数据存储失败: {e}")
+            self._write_queue.task_done()
     
     def _ensure_data_dir(self):
         os.makedirs("./data", exist_ok=True)
@@ -83,9 +111,16 @@ class DataStore:
             记录ID
         """
         record = DataRecord(category, source, content, metadata, tags)
-        self.records.append(record)
-        self._save_store()
+        with self._lock:
+            self.records.append(record)
+        self._schedule_save()
         return record.id
+    
+    def _schedule_save(self):
+        """调度异步保存"""
+        with self._lock:
+            records_copy = list(self.records)
+        self._write_queue.put_nowait(records_copy)
     
     def get_records_by_category(self, category: DataCategory) -> List[DataRecord]:
         """按分类查询数据"""
@@ -176,15 +211,6 @@ class DataStore:
             json.dump(export_data, f, ensure_ascii=False, indent=2)
         
         return file_path
-    
-    def _save_store(self):
-        """保存数据存储到文件"""
-        try:
-            data = [r.to_dict() for r in self.records]
-            with open(self._store_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"保存数据存储失败: {e}")
     
     def load_store(self):
         """从文件加载数据存储"""

@@ -3,8 +3,6 @@ import json
 import hashlib
 import asyncio
 from typing import Optional, Any, List, Callable
-from datetime import timedelta
-from functools import lru_cache
 from cachetools import TTLCache
 import os
 
@@ -135,7 +133,7 @@ class MultiLevelCache:
         key_str = ":".join(key_parts)
         
         if len(key_str) > 200:
-            key_hash = hashlib.md5(key_str.encode()).hexdigest()
+            key_hash = hashlib.sha256(key_str.encode()).hexdigest()
             return f"{prefix}:{key_hash}"
         
         return key_str
