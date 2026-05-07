@@ -1,6 +1,7 @@
 import redis
 import json
 import hashlib
+import asyncio
 from typing import Optional, Any, List, Callable
 from datetime import timedelta
 from functools import lru_cache
@@ -27,7 +28,7 @@ class Cache:
         if value:
             try:
                 return json.loads(value)
-            except:
+            except json.JSONDecodeError:
                 return value
         return None
 
@@ -74,7 +75,7 @@ class Cache:
         if value:
             try:
                 return json.loads(value)
-            except:
+            except json.JSONDecodeError:
                 return value
         return None
 
@@ -110,7 +111,7 @@ class Cache:
     def ping(self) -> bool:
         try:
             return self.redis.ping()
-        except:
+        except redis.RedisError:
             return False
 
     def close(self):
@@ -254,6 +255,3 @@ class MultiLevelCache:
 
 cache = Cache()
 multi_level_cache = MultiLevelCache()
-
-
-import asyncio

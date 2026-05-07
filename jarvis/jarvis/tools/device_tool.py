@@ -5,12 +5,13 @@ from jarvis.core.data_store import DataCategory
 
 
 class DeviceTool:
-    _devices = {
-        "空调": {"status": "off", "temperature": 25},
-        "灯光": {"status": "off", "brightness": 50},
-        "窗帘": {"status": "closed"},
-        "音乐": {"status": "off", "volume": 30}
-    }
+    def __init__(self):
+        self._devices = {
+            "空调": {"status": "off", "temperature": 25},
+            "灯光": {"status": "off", "brightness": 50},
+            "窗帘": {"status": "closed"},
+            "音乐": {"status": "off", "volume": 30}
+        }
 
     @tool("control_device")
     @audit_and_store(
@@ -21,7 +22,7 @@ class DeviceTool:
         capture_args=True,
         capture_result=True
     )
-    def control_device(device: str, action: str, parameter: str = None) -> str:
+    def control_device(self, device: str, action: str, parameter: str = None) -> str:
         """
         控制智能家居设备
         
@@ -36,7 +37,7 @@ class DeviceTool:
         original_device = device
         device = device.replace("灯", "灯光").replace("空调", "空调")
         
-        if device not in DeviceTool._devices:
+        if device not in self._devices:
             return f"未知设备: {original_device}"
         
         action_map = {
@@ -48,7 +49,7 @@ class DeviceTool:
         result_text = ""
         
         if normalized_action in ["on", "off"]:
-            DeviceTool._devices[device]["status"] = normalized_action
+            self._devices[device]["status"] = normalized_action
             status_text = "已开启" if normalized_action == "on" else "已关闭"
             result_text = f"{status_text} {device}"
         
@@ -56,7 +57,7 @@ class DeviceTool:
             if device == "空调" and parameter:
                 try:
                     temp = int(parameter)
-                    DeviceTool._devices[device]["temperature"] = temp
+                    self._devices[device]["temperature"] = temp
                     result_text = f"空调温度已调节至 {temp}°C"
                 except ValueError:
                     result_text = "温度参数无效"
@@ -64,7 +65,7 @@ class DeviceTool:
             elif device == "灯光" and parameter:
                 try:
                     brightness = int(parameter)
-                    DeviceTool._devices[device]["brightness"] = max(0, min(100, brightness))
+                    self._devices[device]["brightness"] = max(0, min(100, brightness))
                     result_text = f"灯光亮度已调节至 {brightness}%"
                 except ValueError:
                     result_text = "亮度参数无效"
@@ -72,7 +73,7 @@ class DeviceTool:
             elif device == "音乐" and parameter:
                 try:
                     volume = int(parameter)
-                    DeviceTool._devices[device]["volume"] = max(0, min(100, volume))
+                    self._devices[device]["volume"] = max(0, min(100, volume))
                     result_text = f"音乐音量已调节至 {volume}%"
                 except ValueError:
                     result_text = "音量参数无效"
@@ -94,7 +95,7 @@ class DeviceTool:
         capture_args=True,
         capture_result=True
     )
-    def get_device_status(device: str = None) -> str:
+    def get_device_status(self, device: str = None) -> str:
         """
         获取设备状态
         
@@ -107,8 +108,8 @@ class DeviceTool:
         if device:
             original_device = device
             device = device.replace("灯", "灯光").replace("空调", "空调")
-            if device in DeviceTool._devices:
-                status = DeviceTool._devices[device]
+            if device in self._devices:
+                status = self._devices[device]
                 status_str = f"{device}: "
                 if status["status"] == "on":
                     status_str += "已开启"
@@ -127,7 +128,7 @@ class DeviceTool:
         
         else:
             result = "当前设备状态:\n"
-            for dev, status in DeviceTool._devices.items():
+            for dev, status in self._devices.items():
                 status_str = f"- {dev}: {'开启' if status['status'] == 'on' else '关闭'}"
                 if "temperature" in status:
                     status_str += f" ({status['temperature']}°C)"

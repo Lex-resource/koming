@@ -25,9 +25,9 @@ class MemoryManager:
         try:
             self.embeddings = OpenAIEmbeddings(
                 model="text-embedding-ada-002",
-                openai_api_key=os.getenv("GLM_API_KEY")
+                openai_api_key=os.getenv("OPENAI_API_KEY")
             )
-        except:
+        except Exception as e:
             self.embeddings = None
 
     def _init_collection(self):
