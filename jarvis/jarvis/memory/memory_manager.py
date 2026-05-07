@@ -171,11 +171,11 @@ class MemoryManager:
         return results[:top_k]
 
     def get_memory_by_id(self, memory_id: str) -> Optional[Dict]:
-        """根据ID获取记忆"""
         if self._connected and self.collection:
             try:
+                safe_id = memory_id.replace('"', '\\"').replace("'", "\\'")
                 results = self.collection.query(
-                    expr=f'memory_id == "{memory_id}"',
+                    expr=f'memory_id == "{safe_id}"',
                     output_fields=["memory_id", "content", "metadata"]
                 )
 

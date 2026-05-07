@@ -21,8 +21,24 @@ class DataCategory(Enum):
 class DataStore:
     """数据分类存储系统 - PostgreSQL增量保存版"""
     
+    _instance = None
+    _init_lock = __import__('threading').Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._init_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
-        self._db = AsyncDatabase()
+        if self._initialized:
+            return
+        
+        self._initialized = True
+        from jarvis.core.database import db as _db_instance
+        self._db = _db_instance
     
     def add_record(
         self,
@@ -39,7 +55,10 @@ class DataStore:
                 future = asyncio.ensure_future(
                     self._add_record_async(category, source, content, metadata, tags)
                 )
-                return future.result() if future.done() else f"data_{uuid.uuid4().hex[:12]}"
+                try:
+                    return future.result(timeout=5.0)
+                except asyncio.TimeoutError:
+                    return f"data_{uuid.uuid4().hex[:12]}"
             else:
                 return loop.run_until_complete(
                     self._add_record_async(category, source, content, metadata, tags)

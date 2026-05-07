@@ -24,7 +24,8 @@ class GlobalLogger:
             return
 
         self._initialized = True
-        self._db = AsyncDatabase()
+        from jarvis.core.database import db as _db_instance
+        self._db = _db_instance
         self.log_dir = "./logs"
         self.session_id = self._generate_session_id()
         self._lock = threading.Lock()

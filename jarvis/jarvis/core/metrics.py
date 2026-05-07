@@ -122,7 +122,7 @@ class MetricsCollector:
             value: 值
             labels: 标签
         """
-        with self._instance_lock:
+        with self._lock:
             key = self._make_key(name, labels)
             self._gauges[key] = value
             self._trigger_hook(name, 'gauge_set', value, labels)

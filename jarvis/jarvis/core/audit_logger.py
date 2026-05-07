@@ -54,8 +54,8 @@ class AuditLogger:
         """延迟初始化数据库连接"""
         if self._db is None:
             try:
-                from jarvis.core.database import AsyncDatabase
-                self._db = AsyncDatabase()
+                from jarvis.core.database import db as _db_instance
+                self._db = _db_instance
             except Exception as e:
                 print(f"⚠️ 审计日志数据库连接失败: {e}")
                 self._db = None

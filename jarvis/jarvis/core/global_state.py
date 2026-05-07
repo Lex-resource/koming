@@ -7,6 +7,8 @@ from typing import Dict, List, Any
 class GlobalState:
     """全局状态管理器 - 记录所有对话历史和系统状态"""
     
+    MAX_HISTORY_SIZE = 1000
+    
     def __init__(self):
         self.conversation_history: List[Dict[str, Any]] = []
         self.system_status: Dict[str, Any] = {
@@ -38,6 +40,10 @@ class GlobalState:
             "system_status": self.system_status.copy()
         }
         self.conversation_history.append(record)
+        
+        if len(self.conversation_history) > self.MAX_HISTORY_SIZE:
+            self.conversation_history = self.conversation_history[-self.MAX_HISTORY_SIZE:]
+        
         self.system_status["total_interactions"] += 1
         self._save_history()
     

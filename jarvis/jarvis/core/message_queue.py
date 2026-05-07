@@ -135,7 +135,6 @@ class MessageQueue:
         self._executor = ThreadPoolExecutor(max_workers=20)
         self._running = False
         self._delivery_threads: Dict[str, threading.Thread] = {}
-        self._lock = threading.RLock()
         self._stats = {
             'total_messages': 0,
             'delivered_messages': 0,

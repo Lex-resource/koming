@@ -163,9 +163,24 @@ class SystemState(Base):
 
 
 class AsyncDatabase:
-    """异步PostgreSQL数据库管理 - 极速版"""
+    """异步PostgreSQL数据库管理 - 单例模式"""
+    
+    _instance = None
+    _init_lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._init_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self):
+        if self._initialized:
+            return
+
+        self._initialized = True
         db_url = os.getenv(
             "DATABASE_URL",
             f"postgresql+asyncpg://{os.getenv('DB_USER', 'postgres')}:{os.getenv('DB_PASSWORD', 'postgres')}@"

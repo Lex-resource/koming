@@ -432,8 +432,3 @@ class CrewManager(EnhancedCrewManager):
 
     def __init__(self):
         super().__init__(enable_async=False, enable_messaging=False)
-
-        self.commander = self._agents.get("Commander")
-        self.analyst = self._agents.get("Analyst")
-        self.executor = self._agents.get("Executor")
-        self.learner = self._agents.get("Learner")
