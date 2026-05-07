@@ -11,109 +11,232 @@ class Cache:
     """Redis缓存管理器"""
 
     def __init__(self):
-        self.redis = redis.Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", 6379)),
-            db=int(os.getenv("REDIS_DB", 0)),
-            password=os.getenv("REDIS_PASSWORD"),
-            decode_responses=True
-        )
-
+        self._connected = False
+        self.redis = None
         self.default_ttl = int(os.getenv("REDIS_TTL", 3600))
 
-    def get(self, key: str) -> Optional[Any]:
-        value = self.redis.get(key)
-        if value:
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return value
-        return None
-
-    def set(self, key: str, value: Any, ttl: int = None) -> bool:
-        if ttl is None:
-            ttl = self.default_ttl
-        
-        if isinstance(value, (dict, list)):
-            value = json.dumps(value, ensure_ascii=False)
-        
-        return self.redis.setex(key, ttl, value)
-
-    def delete(self, key: str) -> bool:
-        return bool(self.redis.delete(key))
-
-    def exists(self, key: str) -> bool:
-        return bool(self.redis.exists(key))
-
-    def expire(self, key: str, ttl: int) -> bool:
-        return bool(self.redis.expire(key, ttl))
-
-    def keys(self, pattern: str = "*") -> List[str]:
-        return self.redis.keys(pattern)
-
-    def flush_pattern(self, pattern: str = "*") -> int:
-        keys = self.keys(pattern)
-        if keys:
-            return self.redis.delete(*keys)
-        return 0
-
-    def incr(self, key: str, amount: int = 1) -> int:
-        return self.redis.incrby(key, amount)
-
-    def decr(self, key: str, amount: int = 1) -> int:
-        return self.redis.decrby(key, amount)
-
-    def hset(self, name: str, key: str, value: Any) -> int:
-        if isinstance(value, (dict, list)):
-            value = json.dumps(value, ensure_ascii=False)
-        return self.redis.hset(name, key, value)
-
-    def hget(self, name: str, key: str) -> Optional[Any]:
-        value = self.redis.hget(name, key)
-        if value:
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError:
-                return value
-        return None
-
-    def hgetall(self, name: str) -> dict:
-        return self.redis.hgetall(name)
-
-    def hdel(self, name: str, *keys) -> int:
-        return self.redis.hdel(name, *keys)
-
-    def publish(self, channel: str, message: Any) -> int:
-        if isinstance(message, (dict, list)):
-            message = json.dumps(message, ensure_ascii=False)
-        return self.redis.publish(channel, message)
-
-    def get_pubsub(self):
-        return self.redis.pubsub()
-
-    def get_statistics(self) -> dict:
-        info = self.redis.info("stats")
-        memory = self.redis.info("memory")
-        return {
-            "connected_clients": self.redis.info("clients")["connected_clients"],
-            "total_commands_processed": info.get("total_commands_processed", 0),
-            "keyspace_hits": info.get("keyspace_hits", 0),
-            "keyspace_misses": info.get("keyspace_misses", 0),
-            "used_memory_human": memory.get("used_memory_human", "0"),
-            "db_keys": self.redis.dbsize()
-        }
-
-    def flush_all(self):
-        self.redis.flushall()
-
-    def ping(self) -> bool:
         try:
-            return self.redis.ping()
-        except redis.RedisError:
+            self.redis = redis.Redis(
+                host=os.getenv("REDIS_HOST", "localhost"),
+                port=int(os.getenv("REDIS_PORT", 6379)),
+                db=int(os.getenv("REDIS_DB", 0)),
+                password=os.getenv("REDIS_PASSWORD"),
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5
+            )
+            self.redis.ping()
+            self._connected = True
+            print("✓ Redis缓存连接成功")
+        except Exception as e:
+            print(f"⚠️ Redis连接失败，使用空缓存: {e}")
+            self._connected = False
+
+    def _ensure_connected(self) -> bool:
+        if not self._connected or self.redis is None:
+            return False
+        try:
+            self.redis.ping()
+            return True
+        except Exception:
+            self._connected = False
             return False
 
+    def get(self, key: str) -> Optional[Any]:
+        if not self._ensure_connected():
+            return None
+        try:
+            value = self.redis.get(key)
+            if value:
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError:
+                    return value
+            return None
+        except Exception:
+            self._connected = False
+            return None
+
+    def set(self, key: str, value: Any, ttl: int = None) -> bool:
+        if not self._ensure_connected():
+            return False
+        if ttl is None:
+            ttl = self.default_ttl
+
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value, ensure_ascii=False)
+
+        try:
+            return self.redis.setex(key, ttl, value)
+        except Exception:
+            self._connected = False
+            return False
+
+    def delete(self, key: str) -> bool:
+        if not self._ensure_connected():
+            return False
+        try:
+            return bool(self.redis.delete(key))
+        except Exception:
+            self._connected = False
+            return False
+
+    def exists(self, key: str) -> bool:
+        if not self._ensure_connected():
+            return False
+        try:
+            return bool(self.redis.exists(key))
+        except Exception:
+            self._connected = False
+            return False
+
+    def expire(self, key: str, ttl: int) -> bool:
+        if not self._ensure_connected():
+            return False
+        try:
+            return bool(self.redis.expire(key, ttl))
+        except Exception:
+            self._connected = False
+            return False
+
+    def keys(self, pattern: str = "*") -> List[str]:
+        if not self._ensure_connected():
+            return []
+        try:
+            return self.redis.keys(pattern)
+        except Exception:
+            self._connected = False
+            return []
+
+    def flush_pattern(self, pattern: str = "*") -> int:
+        if not self._ensure_connected():
+            return 0
+        try:
+            keys = self.keys(pattern)
+            if keys:
+                return self.redis.delete(*keys)
+            return 0
+        except Exception:
+            self._connected = False
+            return 0
+
+    def incr(self, key: str, amount: int = 1) -> int:
+        if not self._ensure_connected():
+            return 0
+        try:
+            return self.redis.incrby(key, amount)
+        except Exception:
+            self._connected = False
+            return 0
+
+    def decr(self, key: str, amount: int = 1) -> int:
+        if not self._ensure_connected():
+            return 0
+        try:
+            return self.redis.decrby(key, amount)
+        except Exception:
+            self._connected = False
+            return 0
+
+    def hset(self, name: str, key: str, value: Any) -> int:
+        if not self._ensure_connected():
+            return 0
+        try:
+            if isinstance(value, (dict, list)):
+                value = json.dumps(value, ensure_ascii=False)
+            return self.redis.hset(name, key, value)
+        except Exception:
+            self._connected = False
+            return 0
+
+    def hget(self, name: str, key: str) -> Optional[Any]:
+        if not self._ensure_connected():
+            return None
+        try:
+            value = self.redis.hget(name, key)
+            if value:
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError:
+                    return value
+            return None
+        except Exception:
+            self._connected = False
+            return None
+
+    def hgetall(self, name: str) -> dict:
+        if not self._ensure_connected():
+            return {}
+        try:
+            return self.redis.hgetall(name)
+        except Exception:
+            self._connected = False
+            return {}
+
+    def hdel(self, name: str, *keys) -> int:
+        if not self._ensure_connected():
+            return 0
+        try:
+            return self.redis.hdel(name, *keys)
+        except Exception:
+            self._connected = False
+            return 0
+
+    def publish(self, channel: str, message: Any) -> int:
+        if not self._ensure_connected():
+            return 0
+        try:
+            if isinstance(message, (dict, list)):
+                message = json.dumps(message, ensure_ascii=False)
+            return self.redis.publish(channel, message)
+        except Exception:
+            self._connected = False
+            return 0
+
+    def get_pubsub(self):
+        if not self._ensure_connected():
+            return None
+        try:
+            return self.redis.pubsub()
+        except Exception:
+            self._connected = False
+            return None
+
+    def get_statistics(self) -> dict:
+        if not self._ensure_connected():
+            return {"connected": False, "error": "Not connected"}
+        try:
+            info = self.redis.info("stats")
+            memory = self.redis.info("memory")
+            return {
+                "connected_clients": self.redis.info("clients")["connected_clients"],
+                "total_commands_processed": info.get("total_commands_processed", 0),
+                "keyspace_hits": info.get("keyspace_hits", 0),
+                "keyspace_misses": info.get("keyspace_misses", 0),
+                "used_memory_human": memory.get("used_memory_human", "0"),
+                "db_keys": self.redis.dbsize()
+            }
+        except Exception:
+            return {"connected": False, "error": "Failed to get stats"}
+
+    def flush_all(self):
+        if not self._ensure_connected():
+            return
+        try:
+            self.redis.flushall()
+        except Exception:
+            pass
+
+    def ping(self) -> bool:
+        return self._ensure_connected()
+
     def close(self):
-        self.redis.close()
+        if self.redis:
+            try:
+                self.redis.close()
+            except Exception:
+                pass
+        self._connected = False
 
 
 class MultiLevelCache:

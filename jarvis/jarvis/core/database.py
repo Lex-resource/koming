@@ -366,8 +366,16 @@ class AsyncDatabase:
 
     async def set_system_state(self, key: str, value: Any) -> None:
         async with self.get_session() as session:
-            state = SystemState(key=key, value=value)
-            session.add(state)
+            from sqlalchemy import select
+            result = await session.execute(
+                select(SystemState).where(SystemState.key == key)
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                existing.value = value
+            else:
+                session.add(SystemState(key=key, value=value))
 
     async def get_system_state(self, key: str) -> Optional[Any]:
         async with self.get_session() as session:

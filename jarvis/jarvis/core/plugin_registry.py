@@ -11,6 +11,7 @@ import os
 import json
 import importlib
 import inspect
+import threading
 from typing import Dict, Type, List, Any, Optional, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -57,7 +58,7 @@ class PluginRegistry:
         self._initialized = True
         self._config_file = "./data/plugin_config.json"
         self._plugins_dir = "./jarvis/plugins"
-        self._instance_lock = threading.RLock()
+        self._instance_lock = threading.Lock()
         self._ensure_plugins_dir()
 
     def _ensure_plugins_dir(self):

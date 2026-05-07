@@ -86,35 +86,36 @@ class SearchTool:
                         '--no-sandbox'
                     ]
                 )
-                page = browser.new_page()
-                page.set_extra_http_headers({
-                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
-                })
+                try:
+                    page = browser.new_page()
+                    page.set_extra_http_headers({
+                        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+                    })
 
-                url = f"{engine_config['url']}?{engine_config['query_param']}={encoded_query}"
-                page.goto(url, wait_until="networkidle", timeout=30000)
+                    url = f"{engine_config['url']}?{engine_config['query_param']}={encoded_query}"
+                    page.goto(url, wait_until="networkidle", timeout=30000)
 
-                results = []
-                for i in range(min(max_results, 10)):
-                    try:
-                        title_selector = engine_config["result_selector"].format(i=i)
-                        desc_selector = engine_config["desc_selector"].format(i=i)
-                        title = page.locator(title_selector).first.inner_text()
-                        desc = page.locator(desc_selector).first.inner_text()
-                        
-                        safe_title = SearchTool._escape_html(title)
-                        safe_desc = SearchTool._escape_html(desc)
-                        
-                        results.append(f"{i+1}. {safe_title}\n{safe_desc}\n")
-                    except Exception as e:
-                        continue
+                    results = []
+                    for i in range(min(max_results, 10)):
+                        try:
+                            title_selector = engine_config["result_selector"].format(i=i)
+                            desc_selector = engine_config["desc_selector"].format(i=i)
+                            title = page.locator(title_selector).first.inner_text()
+                            desc = page.locator(desc_selector).first.inner_text()
 
-                browser.close()
+                            safe_title = SearchTool._escape_html(title)
+                            safe_desc = SearchTool._escape_html(desc)
 
-                if results:
-                    return "\n".join(results)
-                else:
-                    return "未找到相关信息"
+                            results.append(f"{i+1}. {safe_title}\n{safe_desc}\n")
+                        except Exception as e:
+                            continue
+
+                    if results:
+                        return "\n".join(results)
+                    else:
+                        return "未找到相关信息"
+                finally:
+                    browser.close()
 
         except Exception as e:
             return f"搜索失败: {str(e)}"
@@ -175,15 +176,16 @@ class SearchTool:
                         '--no-sandbox'
                     ]
                 )
-                page = browser.new_page()
+                try:
+                    page = browser.new_page()
 
-                page.goto(url, wait_until="networkidle", timeout=30000)
+                    page.goto(url, wait_until="networkidle", timeout=30000)
 
-                content = page.locator(safe_selector).first.inner_text()
+                    content = page.locator(safe_selector).first.inner_text()
 
-                browser.close()
-
-                return content[:2000] if len(content) > 2000 else content
+                    return content[:2000] if len(content) > 2000 else content
+                finally:
+                    browser.close()
 
         except Exception as e:
             return f"网页抓取失败: {str(e)}"

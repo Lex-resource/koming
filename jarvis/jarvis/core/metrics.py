@@ -63,6 +63,8 @@ class MetricsCollector:
         self._metric_types: Dict[str, MetricType] = {}
         self._metric_labels: Dict[str, List[str]] = {}
         self._lock = threading.RLock()
+        self._max_histogram_size = 10000
+        self._max_summary_size = 10000
         self._hooks: Dict[str, List[Callable]] = defaultdict(list)
         self._export_formats = ["prometheus", "json", "text"]
 
@@ -82,7 +84,7 @@ class MetricsCollector:
             description: 描述
             labels: 标签列表
         """
-        with self._instance_lock:
+        with self._lock:
             self._metric_types[name] = metric_type
             self._metric_descriptions[name] = description
             self._metric_labels[name] = labels or []
@@ -132,7 +134,7 @@ class MetricsCollector:
         labels: Optional[Dict[str, str]] = None
     ):
         """增加仪表值"""
-        with self._instance_lock:
+        with self._lock:
             key = self._make_key(name, labels)
             self._gauges[key] += value
 
@@ -143,7 +145,7 @@ class MetricsCollector:
         labels: Optional[Dict[str, str]] = None
     ):
         """减少仪表值"""
-        with self._instance_lock:
+        with self._lock:
             key = self._make_key(name, labels)
             self._gauges[key] -= value
 
@@ -161,7 +163,7 @@ class MetricsCollector:
             value: 值
             labels: 标签
         """
-        with self._instance_lock:
+        with self._lock:
             key = self._make_key(name, labels)
             self._histograms[key].append(value)
             if len(self._histograms[key]) > self._max_histogram_size:
@@ -176,7 +178,7 @@ class MetricsCollector:
         labels: Optional[Dict[str, str]] = None
     ):
         """记录摘要值"""
-        with self._instance_lock:
+        with self._lock:
             key = self._make_key(name, labels)
             self._summaries[key].append(value)
             if len(self._summaries[key]) > self._max_summary_size:
@@ -222,7 +224,7 @@ class MetricsCollector:
         """获取指标值"""
         key = self._make_key(name, labels)
 
-        with self._instance_lock:
+        with self._lock:
             if name in self._metric_types:
                 metric_type = self._metric_types[name]
 
@@ -241,7 +243,7 @@ class MetricsCollector:
 
     def get_all_metrics(self) -> Dict[str, Any]:
         """获取所有指标"""
-        with self._instance_lock:
+        with self._lock:
             return {
                 'counters': dict(self._counters),
                 'gauges': dict(self._gauges),
@@ -286,7 +288,7 @@ class MetricsCollector:
         lines = []
         timestamp = int(time.time() * 1000)
 
-        with self._instance_lock:
+        with self._lock:
             for name, metric_type in self._metric_types.items():
                 description = self._metric_descriptions.get(name, '')
 
@@ -332,7 +334,7 @@ class MetricsCollector:
 
     def reset(self):
         """重置所有指标"""
-        with self._instance_lock:
+        with self._lock:
             self._counters.clear()
             self._gauges.clear()
             self._histograms.clear()
