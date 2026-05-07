@@ -82,7 +82,7 @@ class MetricsCollector:
             description: 描述
             labels: 标签列表
         """
-        with self._lock:
+        with self._instance_lock:
             self._metric_types[name] = metric_type
             self._metric_descriptions[name] = description
             self._metric_labels[name] = labels or []
@@ -120,7 +120,7 @@ class MetricsCollector:
             value: 值
             labels: 标签
         """
-        with self._lock:
+        with self._instance_lock:
             key = self._make_key(name, labels)
             self._gauges[key] = value
             self._trigger_hook(name, 'gauge_set', value, labels)
@@ -132,7 +132,7 @@ class MetricsCollector:
         labels: Optional[Dict[str, str]] = None
     ):
         """增加仪表值"""
-        with self._lock:
+        with self._instance_lock:
             key = self._make_key(name, labels)
             self._gauges[key] += value
 
@@ -143,7 +143,7 @@ class MetricsCollector:
         labels: Optional[Dict[str, str]] = None
     ):
         """减少仪表值"""
-        with self._lock:
+        with self._instance_lock:
             key = self._make_key(name, labels)
             self._gauges[key] -= value
 
@@ -161,11 +161,11 @@ class MetricsCollector:
             value: 值
             labels: 标签
         """
-        with self._lock:
+        with self._instance_lock:
             key = self._make_key(name, labels)
             self._histograms[key].append(value)
-            if len(self._histograms[key]) > 10000:
-                self._histograms[key] = self._histograms[key][-5000:]
+            if len(self._histograms[key]) > self._max_histogram_size:
+                self._histograms[key] = self._histograms[key][-self._max_histogram_size:]
 
             self._trigger_hook(name, 'histogram_observe', value, labels)
 
@@ -176,11 +176,11 @@ class MetricsCollector:
         labels: Optional[Dict[str, str]] = None
     ):
         """记录摘要值"""
-        with self._lock:
+        with self._instance_lock:
             key = self._make_key(name, labels)
             self._summaries[key].append(value)
-            if len(self._summaries[key]) > 10000:
-                self._summaries[key] = self._summaries[key][-5000:]
+            if len(self._summaries[key]) > self._max_summary_size:
+                self._summaries[key] = self._summaries[key][-self._max_summary_size:]
 
     def _make_key(self, name: str, labels: Optional[Dict[str, str]] = None) -> str:
         """生成带标签的键"""
@@ -222,7 +222,7 @@ class MetricsCollector:
         """获取指标值"""
         key = self._make_key(name, labels)
 
-        with self._lock:
+        with self._instance_lock:
             if name in self._metric_types:
                 metric_type = self._metric_types[name]
 
@@ -241,7 +241,7 @@ class MetricsCollector:
 
     def get_all_metrics(self) -> Dict[str, Any]:
         """获取所有指标"""
-        with self._lock:
+        with self._instance_lock:
             return {
                 'counters': dict(self._counters),
                 'gauges': dict(self._gauges),
@@ -286,7 +286,7 @@ class MetricsCollector:
         lines = []
         timestamp = int(time.time() * 1000)
 
-        with self._lock:
+        with self._instance_lock:
             for name, metric_type in self._metric_types.items():
                 description = self._metric_descriptions.get(name, '')
 
@@ -332,7 +332,7 @@ class MetricsCollector:
 
     def reset(self):
         """重置所有指标"""
-        with self._lock:
+        with self._instance_lock:
             self._counters.clear()
             self._gauges.clear()
             self._histograms.clear()

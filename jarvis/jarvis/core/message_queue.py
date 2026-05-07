@@ -202,7 +202,7 @@ class MessageQueue:
             correlation_id=correlation_id
         )
 
-        with self._lock:
+        with self._instance_lock:
             self._topics[topic].put(message)
             self._message_store[message_id] = message
             self._stats['total_messages'] += 1
@@ -262,7 +262,7 @@ class MessageQueue:
         Returns:
             是否成功取消
         """
-        with self._lock:
+        with self._instance_lock:
             subscription = self._subscription_map.pop(subscription_id, None)
             if subscription:
                 self._subscriptions[subscription.topic].remove(subscription)
@@ -276,7 +276,7 @@ class MessageQueue:
         if not self._running:
             return
 
-        with self._lock:
+        with self._instance_lock:
             subscriptions = [
                 sub for sub in self._subscriptions.get(message.topic, [])
                 if sub.can_receive(message)

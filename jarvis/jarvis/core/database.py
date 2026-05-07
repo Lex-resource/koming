@@ -177,6 +177,7 @@ class AsyncDatabase:
             pool_size=20,
             max_overflow=40,
             pool_pre_ping=True,
+            pool_recycle=3600,
             echo=False
         )
         
@@ -185,21 +186,43 @@ class AsyncDatabase:
             class_=AsyncSession,
             expire_on_commit=False
         )
+        
+        self._connection_retry_times = 3
+        self._connection_retry_delay = 2.0
 
     async def init_db(self):
         """异步初始化数据库表"""
-        async with self.async_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        for attempt in range(self._connection_retry_times):
+            try:
+                async with self.async_engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
+                print("✓ 数据库表初始化成功")
+                return
+            except Exception as e:
+                if attempt < self._connection_retry_times - 1:
+                    print(f"⚠️ 数据库初始化失败，{self._connection_retry_delay}秒后重试 ({attempt + 1}/{self._connection_retry_times})")
+                    await asyncio.sleep(self._connection_retry_delay)
+                else:
+                    print(f"❌ 数据库初始化失败: {e}")
+                    raise
 
     @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
-        async with self.async_session() as session:
+        for attempt in range(self._connection_retry_times):
             try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
+                async with self.async_session() as session:
+                    try:
+                        yield session
+                        await session.commit()
+                    except Exception:
+                        await session.rollback()
+                        raise
+            except Exception as e:
+                if attempt < self._connection_retry_times - 1:
+                    print(f"⚠️ 数据库连接失败，重试中 ({attempt + 1}/{self._connection_retry_times})")
+                    await asyncio.sleep(self._connection_retry_delay)
+                else:
+                    raise ConnectionError(f"数据库连接失败，已重试{self._connection_retry_times}次: {e}")
 
     async def create_user(self, username: str, email: str, metadata: Dict = None) -> Dict:
         async with self.get_session() as session:

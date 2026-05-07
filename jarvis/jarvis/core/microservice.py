@@ -347,7 +347,11 @@ class BaseAgentService:
         """处理HTTP请求"""
         try:
             data = await request.json()
-        except:
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"⚠️ JSON解析失败: {e}")
+            data = {}
+        except Exception as e:
+            print(f"⚠️ 请求解析失败: {e}")
             data = {}
 
         service_request = ServiceRequest(

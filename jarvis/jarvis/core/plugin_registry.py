@@ -33,6 +33,7 @@ class PluginRegistry:
     """Agent插件注册中心 - 单例模式"""
 
     _instance = None
+    _init_lock = threading.Lock()
     _agents: Dict[str, Type] = {}
     _metadata: Dict[str, PluginMetadata] = {}
     _plugin_hooks: Dict[str, List[Callable]] = {
@@ -44,8 +45,10 @@ class PluginRegistry:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._init_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
     def __init__(self):
@@ -54,6 +57,7 @@ class PluginRegistry:
         self._initialized = True
         self._config_file = "./data/plugin_config.json"
         self._plugins_dir = "./jarvis/plugins"
+        self._instance_lock = threading.RLock()
         self._ensure_plugins_dir()
 
     def _ensure_plugins_dir(self):

@@ -88,16 +88,26 @@ class AsyncTask:
 
 
 class AsyncTaskExecutor:
-    """异步任务执行器"""
+    """异步任务执行器 - 单例模式"""
+
+    _instance = None
+    _init_lock = threading.Lock()
+
+    def __new__(cls, max_workers: int = 10, default_timeout: float = 300.0):
+        if cls._instance is None:
+            with cls._init_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+                    cls._instance._max_workers = max_workers
+                    cls._instance._default_timeout = default_timeout
+        return cls._instance
 
     def __init__(self, max_workers: int = 10, default_timeout: float = 300.0):
-        """
-        初始化异步任务执行器
+        if self._initialized:
+            return
 
-        Args:
-            max_workers: 最大工作线程数
-            default_timeout: 默认超时时间（秒）
-        """
+        self._initialized = True
         self.max_workers = max_workers
         self.default_timeout = default_timeout
         self.tasks: Dict[str, AsyncTask] = {}
@@ -108,6 +118,8 @@ class AsyncTaskExecutor:
         self._task_counter = 0
         self._lock = threading.Lock()
         self._results: Dict[str, TaskResult] = {}
+        self._pending_tasks: List[AsyncTask] = []
+        self._startup_lock = threading.Lock()
 
     def start(self):
         """启动异步任务执行器"""
@@ -256,6 +268,23 @@ class AsyncTaskExecutor:
             for task_id in tasks_to_remove:
                 self.tasks.pop(task_id, None)
 
+    async def _flush_pending_tasks(self):
+        """定期处理待处理任务队列"""
+        while self.running:
+            await asyncio.sleep(0.5)
+
+            while self._pending_tasks and self.loop and self.loop.is_running():
+                task = self._pending_tasks.pop(0)
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        self.task_queue.put(task),
+                        self.loop
+                    ).result(timeout=1.0)
+                except Exception as e:
+                    self._pending_tasks.insert(0, task)
+                    await asyncio.sleep(0.1)
+                    break
+
     def create_task(
         self,
         task_type: str,
@@ -268,7 +297,7 @@ class AsyncTaskExecutor:
         tags: List[str] = None
     ) -> str:
         """
-        创建异步任务
+        创建异步任务（同步接口）
 
         Args:
             task_type: 任务类型
@@ -300,16 +329,65 @@ class AsyncTaskExecutor:
 
         self.tasks[task_id] = task
 
-        if self.running and self.loop:
-            asyncio.run_coroutine_threadsafe(
-                self.task_queue.put(task),
-                self.loop
-            )
+        if self.running and self.loop and self.loop.is_running():
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    self.task_queue.put(task),
+                    self.loop
+                )
+                future.result(timeout=1.0)
+            except Exception as e:
+                self._pending_tasks.append(task)
         else:
-            self.loop and asyncio.run_coroutine_threadsafe(
-                self.task_queue.put(task),
-                self.loop
-            )
+            self._pending_tasks.append(task)
+
+        print(f"✓ 任务已创建 [{task_id}] - {description} (优先级: {priority.name})")
+        return task_id
+
+    async def create_task_async(
+        self,
+        task_type: str,
+        description: str,
+        func: Callable,
+        kwargs: Dict[str, Any] = None,
+        priority: TaskPriority = TaskPriority.NORMAL,
+        timeout: Optional[float] = None,
+        callback: Optional[Callable] = None,
+        tags: List[str] = None
+    ) -> str:
+        """
+        创建异步任务（异步接口）
+
+        Args:
+            task_type: 任务类型
+            description: 任务描述
+            func: 异步函数或普通函数
+            kwargs: 函数参数
+            priority: 优先级
+            timeout: 超时时间
+            callback: 完成后回调函数
+            tags: 标签列表
+
+        Returns:
+            任务ID
+        """
+        with self._lock:
+            self._task_counter += 1
+            task_id = f"task_{self._task_counter:06d}_{uuid.uuid4().hex[:8]}"
+
+        task = AsyncTask(
+            task_id=task_id,
+            task_type=task_type,
+            description=description,
+            payload={'func': func, 'kwargs': kwargs or {}},
+            priority=priority,
+            timeout=timeout or self.default_timeout,
+            callback=callback,
+            tags=tags or []
+        )
+
+        self.tasks[task_id] = task
+        await self.task_queue.put(task)
 
         print(f"✓ 任务已创建 [{task_id}] - {description} (优先级: {priority.name})")
         return task_id

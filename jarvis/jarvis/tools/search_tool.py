@@ -6,6 +6,7 @@ from jarvis.core.data_store import DataCategory
 from jarvis.config.settings import Settings
 import urllib.parse
 import re
+import html
 import os
 
 
@@ -24,6 +25,19 @@ class SearchTool:
             "desc_selector": "#b_results li.b_algo p"
         }
     }
+
+    @staticmethod
+    def _escape_html(text: str) -> str:
+        """HTML转义，防止XSS攻击"""
+        if not text:
+            return ""
+        return html.escape(text)
+
+    @staticmethod
+    def _sanitize_filename(text: str) -> str:
+        """安全的文件名"""
+        text = re.sub(r'[^\w\s\-]', '', text)
+        return text.strip()[:50]
 
     @tool("web_search")
     @audit_and_store(
@@ -57,12 +71,25 @@ class SearchTool:
         encoded_query = urllib.parse.quote(query, safe='')
         
         search_engine = os.getenv("SEARCH_ENGINE", "baidu").lower()
-        engine_config = SearchTool.SEARCH_ENGINES.get(search_engine, SearchTool.SEARCH_ENGINES["baidu"])
+        if search_engine not in SearchTool.SEARCH_ENGINES:
+            search_engine = "baidu"
+        
+        engine_config = SearchTool.SEARCH_ENGINES[search_engine]
         
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
                 page = browser.new_page()
+                page.set_extra_http_headers({
+                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+                })
 
                 url = f"{engine_config['url']}?{engine_config['query_param']}={encoded_query}"
                 page.goto(url, wait_until="networkidle", timeout=30000)
@@ -74,13 +101,20 @@ class SearchTool:
                         desc_selector = engine_config["desc_selector"].format(i=i)
                         title = page.locator(title_selector).first.inner_text()
                         desc = page.locator(desc_selector).first.inner_text()
-                        results.append(f"{i+1}. {title}\n{desc}\n")
-                    except Exception:
-                        break
+                        
+                        safe_title = SearchTool._escape_html(title)
+                        safe_desc = SearchTool._escape_html(desc)
+                        
+                        results.append(f"{i+1}. {safe_title}\n{safe_desc}\n")
+                    except Exception as e:
+                        continue
 
                 browser.close()
 
-                return "\n".join(results) if results else "未找到相关信息"
+                if results:
+                    return "\n".join(results)
+                else:
+                    return "未找到相关信息"
 
         except Exception as e:
             return f"搜索失败: {str(e)}"
@@ -120,19 +154,32 @@ class SearchTool:
             return "只支持http和https协议"
         
         allowed_domains = os.getenv("ALLOWED_SCRAPE_DOMAINS", "").split(",")
-        if allowed_domains and allowed_domains[0]:
+        allowed_domains = [d.strip() for d in allowed_domains if d.strip()]
+        
+        if allowed_domains:
             domain = parsed_url.netloc
             if not any(domain.endswith(allowed_domain.strip()) for allowed_domain in allowed_domains):
                 return f"不允许访问该域名，允许的域名: {', '.join(allowed_domains)}"
         
+        safe_selector = re.sub(r'[^a-zA-Z0-9\s\-_:#.\[\]=>]', '', selector)
+        if len(safe_selector) > 100:
+            safe_selector = "body"
+        
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-dev-shm-usage',
+                        '--no-sandbox'
+                    ]
+                )
                 page = browser.new_page()
 
                 page.goto(url, wait_until="networkidle", timeout=30000)
 
-                content = page.locator(selector).first.inner_text()
+                content = page.locator(safe_selector).first.inner_text()
 
                 browser.close()
 
