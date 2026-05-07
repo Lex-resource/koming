@@ -44,7 +44,7 @@ def audit(
                         "args": [str(arg) for arg in args],
                         "kwargs": {k: str(v) for k, v in kwargs.items()}
                     }, ensure_ascii=False)
-                except:
+                except (TypeError, ValueError):
                     args_str = "参数无法序列化"
             
             # 记录开始日志
@@ -66,7 +66,7 @@ def audit(
                 if capture_result:
                     try:
                         result_str = str(result)[:200] if result else None
-                    except:
+                    except (TypeError, ValueError):
                         result_str = "结果无法序列化"
                 
                 audit_logger.log_operation(
@@ -222,7 +222,7 @@ def audit_and_store(
                         "args": [str(arg) for arg in args],
                         "kwargs": {k: str(v) for k, v in kwargs.items()}
                     }, ensure_ascii=False)
-                except:
+                except (TypeError, ValueError):
                     args_str = "参数无法序列化"
             
             # 记录开始审计日志
@@ -252,7 +252,7 @@ def audit_and_store(
                 if capture_result:
                     try:
                         result_str = str(result)[:200] if result else None
-                    except:
+                    except (TypeError, ValueError):
                         result_str = "结果无法序列化"
                 
                 # 记录审计日志

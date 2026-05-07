@@ -107,7 +107,7 @@ class DeviceTool:
         """
         if device:
             original_device = device
-            device = device.replace("灯", "灯光").replace("空调", "空调")
+            device = device.replace("灯", "灯光")
             if device in self._devices:
                 status = self._devices[device]
                 status_str = f"{device}: "
