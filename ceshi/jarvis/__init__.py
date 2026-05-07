@@ -12,6 +12,7 @@ from .core.data_store import data_store, DataCategory, DataRecord
 from .core.decorators import audit, store_data, audit_and_store
 from .core.global_state import global_state
 from .core.crew_manager import CrewManager
+from .core.persistence import persistent_store, PersistentStore
 
 __all__ = [
     'Settings',
@@ -33,6 +34,8 @@ __all__ = [
     'audit_and_store',
     'global_state',
     'CrewManager',
+    'persistent_store',
+    'PersistentStore',
 ]
 
 __version__ = "1.0.0"
