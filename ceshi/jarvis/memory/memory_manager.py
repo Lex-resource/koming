@@ -1,84 +1,220 @@
+from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
+from langchain.embeddings import OpenAIEmbeddings
+from typing import List, Dict, Optional
+import numpy as np
 import os
-from chromadb import Client
-from chromadb.config import Settings as ChromaSettings
 from jarvis.config.settings import Settings
 
 
 class MemoryManager:
-    def __init__(self):
-        os.makedirs(Settings.MEMORY_CHROMA_PATH, exist_ok=True)
-        self.client = Client(
-            settings=ChromaSettings(
-                persist_directory=Settings.MEMORY_CHROMA_PATH,
-                anonymized_telemetry=False
-            )
-        )
-        self.collection = self.client.get_or_create_collection("jarvis_memory")
+    """Milvus向量数据库记忆管理器"""
 
-    def add_memory(self, content: str, metadata: dict = None):
+    def __init__(self, collection_name: str = "jarvis_memory"):
+        self.collection_name = collection_name
+        self.embedding_dim = 1536
+        
+        self.connections = connections
+        self.connections.connect(
+            alias="default",
+            host=os.getenv("MILVUS_HOST", "localhost"),
+            port=os.getenv("MILVUS_PORT", "19530")
+        )
+        
+        self._init_collection()
+        
+        try:
+            self.embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002",
+                openai_api_key=os.getenv("GLM_API_KEY")
+            )
+        except:
+            self.embeddings = None
+
+    def _init_collection(self):
+        """初始化Milvus集合"""
+        if utility.has_collection(self.collection_name):
+            self.collection = Collection(self.collection_name)
+            self.collection.load()
+        else:
+            fields = [
+                FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+                FieldSchema(name="memory_id", dtype=DataType.VARCHAR, max_length=256),
+                FieldSchema(name="content", dtype=DataType.VARCHAR, max_length=65535),
+                FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=self.embedding_dim),
+                FieldSchema(name="metadata", dtype=DataType.JSON)
+            ]
+            
+            schema = CollectionSchema(fields=fields, description="JARVIS Memory Collection")
+            self.collection = Collection(name=self.collection_name, schema=schema)
+            
+            index_params = {
+                "metric_type": "L2",
+                "index_type": "IVF_FLAT",
+                "params": {"nlist": 128}
+            }
+            self.collection.create_index(field_name="embedding", index_params=index_params)
+            self.collection.load()
+
+    def add_memory(self, content: str, memory_id: str = None, metadata: Dict = None) -> str:
         """
-        添加记忆到知识库
+        添加记忆到向量数据库
         
         Args:
             content: 记忆内容
-            metadata: 元数据（可选）
+            memory_id: 记忆ID（可选，自动生成）
+            metadata: 元数据
+        
+        Returns:
+            记忆ID
         """
+        if memory_id is None:
+            memory_id = f"memory_{int(np.random.randint(0, 1000000))}"
+        
         if metadata is None:
             metadata = {}
         
-        self.collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[f"memory_{len(self.collection.get()['ids']) + 1}"]
-        )
-        self.client.persist()
+        embedding = self._get_embedding(content)
+        
+        entities = [
+            [memory_id],
+            [content],
+            [embedding],
+            [metadata]
+        ]
+        
+        self.collection.insert(entities)
+        self.collection.flush()
+        
+        return memory_id
 
-    def search_memory(self, query: str, n_results: int = 3) -> list:
+    def _get_embedding(self, text: str) -> List[float]:
+        """获取文本向量"""
+        if self.embeddings:
+            return self.embeddings.embed_query(text)
+        else:
+            return np.random.rand(self.embedding_dim).tolist()
+
+    def search_memory(self, query: str, top_k: int = 5) -> List[Dict]:
         """
         搜索记忆
         
         Args:
             query: 搜索查询
-            n_results: 返回结果数量
+            top_k: 返回结果数量
         
         Returns:
             搜索结果列表
         """
-        results = self.collection.query(
-            query_texts=[query],
-            n_results=n_results
+        query_embedding = self._get_embedding(query)
+        
+        search_params = {
+            "metric_type": "L2",
+            "params": {"nprobe": 10}
+        }
+        
+        results = self.collection.search(
+            data=[query_embedding],
+            anns_field="embedding",
+            param=search_params,
+            limit=top_k,
+            output_fields=["memory_id", "content", "metadata"]
         )
         
         memories = []
-        for i, doc in enumerate(results["documents"][0]):
-            memories.append({
-                "content": doc,
-                "metadata": results["metadatas"][0][i] if results["metadatas"] else None,
-                "distance": results["distances"][0][i] if results["distances"] else None
-            })
+        for hits in results:
+            for hit in hits:
+                memories.append({
+                    "id": hit.id,
+                    "memory_id": hit.entity.get("memory_id"),
+                    "content": hit.entity.get("content"),
+                    "metadata": hit.entity.get("metadata"),
+                    "distance": hit.distance
+                })
         
         return memories
 
-    def get_all_memories(self) -> list:
+    def get_memory_by_id(self, memory_id: str) -> Optional[Dict]:
+        """根据ID获取记忆"""
+        results = self.collection.query(
+            expr=f'memory_id == "{memory_id}"',
+            output_fields=["memory_id", "content", "metadata"]
+        )
+        
+        if results:
+            result = results[0]
+            return {
+                "memory_id": result.get("memory_id"),
+                "content": result.get("content"),
+                "metadata": result.get("metadata")
+            }
+        return None
+
+    def get_all_memories(self, limit: int = 1000) -> List[Dict]:
         """
         获取所有记忆
+        
+        Args:
+            limit: 限制返回数量
         
         Returns:
             所有记忆列表
         """
-        results = self.collection.get()
+        results = self.collection.query(
+            expr="id > 0",
+            limit=limit,
+            output_fields=["memory_id", "content", "metadata"]
+        )
+        
         memories = []
-        for i, doc in enumerate(results["documents"]):
+        for result in results:
             memories.append({
-                "id": results["ids"][i],
-                "content": doc,
-                "metadata": results["metadatas"][i] if results["metadatas"] else None
+                "memory_id": result.get("memory_id"),
+                "content": result.get("content"),
+                "metadata": result.get("metadata")
             })
+        
         return memories
 
+    def delete_memory(self, memory_id: str) -> bool:
+        """
+        删除记忆
+        
+        Args:
+            memory_id: 记忆ID
+        
+        Returns:
+            是否删除成功
+        """
+        try:
+            expr = f'memory_id == "{memory_id}"'
+            self.collection.delete(expr)
+            self.collection.flush()
+            return True
+        except Exception:
+            return False
+
     def clear_all_memories(self):
-        """
-        清空所有记忆
-        """
-        self.collection.delete(ids=self.collection.get()["ids"])
-        self.client.persist()
+        """清空所有记忆"""
+        expr = "id > 0"
+        self.collection.delete(expr)
+        self.collection.flush()
+
+    def get_memory_count(self) -> int:
+        """获取记忆数量"""
+        return self.collection.num_entities
+
+    def get_statistics(self) -> Dict:
+        """获取统计信息"""
+        return {
+            "collection_name": self.collection_name,
+            "total_memories": self.collection.num_entities,
+            "embedding_dim": self.embedding_dim,
+            "index_type": "IVF_FLAT"
+        }
+
+    def close(self):
+        """关闭连接"""
+        self.connections.disconnect("default")
+
+
+memory_manager = MemoryManager()
