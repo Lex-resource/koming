@@ -14,13 +14,6 @@
 - 📊 **数据分类存储** - 分门别类存储所有查询数据，支持统计分析
 - 🔧 **装饰器自动记录** - 新增功能自动被审计和存储系统记录
 
-## 技术栈
-
-- **框架**: LangChain + CrewAI
-- **模型**: GLM-4.5-Flash
-- **数据库**: Chroma (向量数据库)
-- **工具**: Python 3.12+
-
 ## 快速开始
 
 ### 1. 安装依赖
@@ -48,38 +41,23 @@ GLM_API_KEY=your_glm_api_key_here
 python main.py
 ```
 
-### 4. 测试装饰器功能（可选）
-
-```bash
-python tests/test_decorators.py
-```
-
-### 5. 运行示例（可选）
-
-```bash
-python examples/decorator_example.py
-```
-
-## 完整项目结构
+## 项目结构
 
 ```
 ceshi/
 ├── jarvis/                    # 核心包
 │   ├── __init__.py            # 包导出模块
 │   ├── agents/                # 智能体模块
-│   │   ├── __init__.py
 │   │   ├── base_agent.py      # 基础智能体类
 │   │   ├── commander.py       # 指挥官智能体
 │   │   ├── analyst.py         # 分析师智能体
 │   │   ├── executor.py        # 执行者智能体
 │   │   └── learner.py         # 学习官智能体
 │   ├── tools/                 # 工具模块
-│   │   ├── __init__.py
 │   │   ├── search_tool.py     # 搜索工具
-│   │   ├── weather_tool.py    # 天气工具
+│   │   ├── weather_tool.py   # 天气工具
 │   │   └── device_tool.py     # 设备控制工具
 │   ├── memory/                # 记忆模块
-│   │   ├── __init__.py
 │   │   └── memory_manager.py  # 记忆管理器
 │   ├── core/                  # 核心模块
 │   │   ├── audit_logger.py    # 审计日志系统
@@ -89,25 +67,17 @@ ceshi/
 │   │   ├── crew_manager.py    # 团队协作管理
 │   │   └── logger.py          # 日志工具
 │   └── config/                # 配置模块
-│       ├── __init__.py
 │       └── settings.py        # 设置类
-├── tests/                     # 测试目录
-│   ├── __init__.py
-│   └── test_decorators.py     # 装饰器测试
 ├── examples/                  # 示例代码
 │   └── decorator_example.py   # 装饰器使用示例
 ├── docs/                      # 文档目录
-│   └── DECORATOR_GUIDE.md     # 装饰器使用指南
+│   ├── TECH_STACK.md          # 技术栈说明
+│   └── DECORATOR_GUIDE.md    # 装饰器使用指南
 ├── scripts/                   # 脚本工具目录
-│   └── __init__.py
 ├── archive/                   # 归档（旧文件）
-│   └── ai_con.py              # 旧版本API调用文件
 ├── data/                      # 数据存储目录
-│   └── .gitkeep               # 目录占位文件
 ├── main.py                    # 主程序入口
 ├── requirements.txt           # 依赖列表
-├── .env                       # 环境变量（不提交）
-├── .env.example               # 环境变量示例
 └── README.md                  # 项目文档
 ```
 
@@ -199,6 +169,20 @@ def your_new_function():
     return result
 ```
 
+## 技术栈
+
+项目使用的主要技术：
+
+| 类别 | 技术 | 版本 |
+|------|------|------|
+| **AI框架** | LangChain | 0.2.14 |
+| **AI框架** | CrewAI | 0.38.0 |
+| **数据存储** | Chroma | 0.5.3 |
+| **HTTP请求** | requests | 2.32.3 |
+| **环境变量** | python-dotenv | 1.0.1 |
+
+详细说明请参考：[docs/TECH_STACK.md](docs/TECH_STACK.md)
+
 ## 开发计划
 
 - [x] 基础架构搭建
@@ -210,18 +194,16 @@ def your_new_function():
 - [ ] 高级功能开发
 - [ ] 系统优化完善
 
-## 目录说明
+## 文档目录
 
-| 目录 | 用途 |
-|------|------|
-| `jarvis/` | 核心包，包含所有业务逻辑 |
-| `tests/` | 测试代码 |
-| `examples/` | 示例代码 |
-| `docs/` | 项目文档 |
-| `scripts/` | 辅助脚本工具 |
-| `archive/` | 旧文件归档 |
-| `data/` | 数据存储目录 |
+| 文档 | 路径 | 说明 |
+|------|------|------|
+| 技术栈说明 | [docs/TECH_STACK.md](docs/TECH_STACK.md) | 详细的技术选型和框架说明 |
+| 装饰器指南 | [docs/DECORATOR_GUIDE.md](docs/DECORATOR_GUIDE.md) | 装饰器使用方法和示例 |
 
-## 相关文档
+## 相关资源
 
-- 装饰器使用指南: [docs/DECORATOR_GUIDE.md](docs/DECORATOR_GUIDE.md)
+- [LangChain文档](https://python.langchain.com/)
+- [CrewAI文档](https://docs.crewai.com/)
+- [Chroma文档](https://docs.trychroma.com/)
+- [智谱AI开放平台](https://open.bigmodel.cn/)
