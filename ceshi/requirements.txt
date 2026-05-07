@@ -1,0 +1,36 @@
+# 核心框架
+langchain==0.2.14
+langchain-community==0.2.12
+crewai==0.38.0
+crewai-tools==0.2.14
+
+# 模型支持
+openai==1.35.10
+
+# 多模态
+pydub==0.25.1
+
+# 工具
+python-dotenv==1.0.1
+requests==2.32.3
+beautifulsoup4==4.12.3
+
+# 浏览器自动化
+playwright==1.44.0
+
+# 数据库
+psycopg2-binary==2.9.9
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.30
+redis==5.0.8
+
+# 向量数据库
+pymilvus==2.4.4
+
+# 缓存
+cachetools==5.5.0
+
+# Web服务
+fastapi==0.111.0
+uvicorn==0.30.1
+pydantic==2.7.4
