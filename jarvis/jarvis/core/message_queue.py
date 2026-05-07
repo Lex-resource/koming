@@ -124,23 +124,27 @@ class MessageQueue:
         if self._initialized:
             return
 
-        self._initialized = True
-        self._topics: Dict[str, queue.PriorityQueue] = defaultdict(
-            lambda: queue.PriorityQueue(maxsize=10000)
-        )
-        self._subscriptions: Dict[str, List[Subscription]] = defaultdict(list)
-        self._subscription_map: Dict[str, Subscription] = {}
-        self._dead_letter_queue: queue.Queue = queue.Queue()
-        self._message_store: Dict[str, Message] = {}
-        self._executor = ThreadPoolExecutor(max_workers=20)
-        self._running = False
-        self._delivery_threads: Dict[str, threading.Thread] = {}
-        self._stats = {
-            'total_messages': 0,
-            'delivered_messages': 0,
-            'failed_messages': 0,
-            'dead_letter_messages': 0
-        }
+        self._lock = threading.RLock()
+        with self._lock:
+            if self._initialized:
+                return
+            self._initialized = True
+            self._topics: Dict[str, queue.PriorityQueue] = defaultdict(
+                lambda: queue.PriorityQueue(maxsize=10000)
+            )
+            self._subscriptions: Dict[str, List[Subscription]] = defaultdict(list)
+            self._subscription_map: Dict[str, Subscription] = {}
+            self._dead_letter_queue: queue.Queue = queue.Queue()
+            self._message_store: Dict[str, Message] = {}
+            self._executor = ThreadPoolExecutor(max_workers=20)
+            self._running = False
+            self._delivery_threads: Dict[str, threading.Thread] = {}
+            self._stats = {
+                'total_messages': 0,
+                'delivered_messages': 0,
+                'failed_messages': 0,
+                'dead_letter_messages': 0
+            }
 
     def start(self):
         """启动消息队列"""

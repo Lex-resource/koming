@@ -99,27 +99,28 @@ class AsyncTaskExecutor:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
-                    cls._instance._max_workers = max_workers
-                    cls._instance._default_timeout = default_timeout
         return cls._instance
 
     def __init__(self, max_workers: int = 10, default_timeout: float = 300.0):
         if self._initialized:
             return
 
-        self._initialized = True
-        self.max_workers = max_workers
-        self.default_timeout = default_timeout
-        self.tasks: Dict[str, AsyncTask] = {}
-        self.task_queue = asyncio.PriorityQueue()
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.loop: Optional[asyncio.AbstractEventLoop] = None
-        self.running = False
-        self._task_counter = 0
-        self._lock = threading.Lock()
-        self._results: Dict[str, TaskResult] = {}
-        self._pending_tasks: List[AsyncTask] = []
-        self._startup_lock = threading.Lock()
+        self._lock = threading.RLock()
+        with self._lock:
+            if self._initialized:
+                return
+            self._initialized = True
+            self.max_workers = max_workers
+            self.default_timeout = default_timeout
+            self.tasks: Dict[str, AsyncTask] = {}
+            self.task_queue = asyncio.PriorityQueue()
+            self.executor = ThreadPoolExecutor(max_workers=max_workers)
+            self.loop: Optional[asyncio.AbstractEventLoop] = None
+            self.running = False
+            self._task_counter = 0
+            self._results: Dict[str, TaskResult] = {}
+            self._pending_tasks: List[AsyncTask] = []
+            self._startup_lock = threading.Lock()
 
     def start(self):
         """启动异步任务执行器"""
