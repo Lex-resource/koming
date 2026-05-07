@@ -1,18 +1,53 @@
 import sqlite3
 import json
+import threading
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
 
 class PersistentStore:
-    """SQLite持久化存储"""
-
+    """SQLite持久化存储 - 优化版"""
+    
     def __init__(self, db_path: str = "./data/jarvis.db"):
         self.db_path = db_path
+        self._local = threading.local()
+        self._stmt_cache = {}
+        self._init_optimizations()
         self._init_db()
 
-    def _init_db(self):
+    def _init_optimizations(self):
+        """初始化数据库优化设置"""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA cache_size=-64000")
+            conn.execute("PRAGMA temp_store=MEMORY")
+            conn.execute("PRAGMA mmap_size=268435456")
+            conn.commit()
+        finally:
+            conn.close()
+
+    def _get_connection(self):
+        """获取数据库连接的上下文管理器 - 线程本地连接"""
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            self._local.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._local.conn.row_factory = sqlite3.Row
+            self._local.conn.execute("PRAGMA journal_mode=WAL")
+            self._local.conn.execute("PRAGMA synchronous=NORMAL")
+        return self._local.conn
+    
+    @contextmanager
+    def _transaction(self):
+        """事务上下文管理器"""
+        conn = self._get_connection()
+        try:
+            yield conn.cursor()
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         """初始化数据库表"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -79,17 +114,26 @@ class PersistentStore:
                 ON data_records(category, timestamp)
             """)
 
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_audit_operation
+                ON audit_logs(operation_type, timestamp)
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_audit_agent
+                ON audit_logs(agent_name, timestamp)
+            """)
+
             conn.commit()
 
-    @contextmanager
     def _get_connection(self):
-        """获取数据库连接的上下文管理器"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        finally:
-            conn.close()
+        """获取数据库连接的上下文管理器 - 线程本地连接"""
+        if not hasattr(self._local, 'conn') or self._local.conn is None:
+            self._local.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._local.conn.row_factory = sqlite3.Row
+            self._local.conn.execute("PRAGMA journal_mode=WAL")
+            self._local.conn.execute("PRAGMA synchronous=NORMAL")
+        yield self._local.conn
 
     def save_conversation(self, user_id: str, user_input: str, response: str,
                         metadata: Dict = None) -> int:
