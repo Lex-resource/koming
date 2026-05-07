@@ -31,7 +31,7 @@ class PluginMetadata:
 
 
 class PluginRegistry:
-    """Agent插件注册中心 - 单例模式"""
+    """Agent插件注册中心 - 单例模式（线程安全）"""
 
     _instance = None
     _init_lock = threading.Lock()
@@ -45,9 +45,9 @@ class PluginRegistry:
     }
 
     def __new__(cls):
-        if cls._instance is None:
+        if not hasattr(cls, '_instance') or cls._instance is None:
             with cls._init_lock:
-                if cls._instance is None:
+                if not hasattr(cls, '_instance') or cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -55,11 +55,14 @@ class PluginRegistry:
     def __init__(self):
         if self._initialized:
             return
-        self._initialized = True
-        self._config_file = "./data/plugin_config.json"
-        self._plugins_dir = "./jarvis/plugins"
-        self._instance_lock = threading.Lock()
-        self._ensure_plugins_dir()
+        with self._init_lock:
+            if self._initialized:
+                return
+            self._initialized = True
+            self._config_file = "./data/plugin_config.json"
+            self._plugins_dir = "./jarvis/plugins"
+            self._instance_lock = threading.RLock()
+            self._ensure_plugins_dir()
 
     def _ensure_plugins_dir(self):
         """确保插件目录存在"""

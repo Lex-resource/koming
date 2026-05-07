@@ -37,15 +37,15 @@ class MetricValue:
 
 
 class MetricsCollector:
-    """指标收集器"""
+    """指标收集器（线程安全）"""
 
     _instance = None
     _lock = threading.Lock()
 
     def __new__(cls):
-        if cls._instance is None:
+        if not hasattr(cls, '_instance') or cls._instance is None:
             with cls._lock:
-                if cls._instance is None:
+                if not hasattr(cls, '_instance') or cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -54,19 +54,22 @@ class MetricsCollector:
         if self._initialized:
             return
 
-        self._initialized = True
-        self._counters: Dict[str, float] = defaultdict(float)
-        self._gauges: Dict[str, float] = defaultdict(float)
-        self._histograms: Dict[str, List[float]] = defaultdict(list)
-        self._summaries: Dict[str, List[float]] = defaultdict(list)
-        self._metric_descriptions: Dict[str, str] = {}
-        self._metric_types: Dict[str, MetricType] = {}
-        self._metric_labels: Dict[str, List[str]] = {}
-        self._lock = threading.RLock()
-        self._max_histogram_size = 10000
-        self._max_summary_size = 10000
-        self._hooks: Dict[str, List[Callable]] = defaultdict(list)
-        self._export_formats = ["prometheus", "json", "text"]
+        with self._lock:
+            if self._initialized:
+                return
+            self._initialized = True
+            self._counters: Dict[str, float] = defaultdict(float)
+            self._gauges: Dict[str, float] = defaultdict(float)
+            self._histograms: Dict[str, List[float]] = defaultdict(list)
+            self._summaries: Dict[str, List[float]] = defaultdict(list)
+            self._metric_descriptions: Dict[str, str] = {}
+            self._metric_types: Dict[str, MetricType] = {}
+            self._metric_labels: Dict[str, List[str]] = {}
+            self._lock = threading.RLock()
+            self._max_histogram_size = 10000
+            self._max_summary_size = 10000
+            self._hooks: Dict[str, List[Callable]] = defaultdict(list)
+            self._export_formats = ["prometheus", "json", "text"]
 
     def register_metric(
         self,

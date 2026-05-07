@@ -17,7 +17,7 @@ class OperationType(Enum):
 
 
 class AuditLogger:
-    """全局审计日志系统 - 直接写入数据库，无内存缓存"""
+    """全局审计日志系统 - 直接写入数据库，无内存缓存（线程安全）"""
 
     _instance = None
     _init_lock = threading.Lock()
@@ -25,9 +25,9 @@ class AuditLogger:
     _counter_lock = threading.Lock()
 
     def __new__(cls):
-        if cls._instance is None:
+        if not hasattr(cls, '_instance') or cls._instance is None:
             with cls._init_lock:
-                if cls._instance is None:
+                if not hasattr(cls, '_instance') or cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -36,15 +36,19 @@ class AuditLogger:
         if self._initialized:
             return
 
-        self._initialized = True
-        self._db = None
-        self._instance_lock = threading.Lock()
-        self._write_thread = None
-        self._running = False
-        self._write_queue: List[Dict[str, Any]] = []
-        self._flush_interval = 1.0
-        self._batch_size = 100
-        self._ensure_data_dir()
+        with self._init_lock:
+            if self._initialized:
+                return
+            self._initialized = True
+            self._db = None
+            self._instance_lock = threading.RLock()
+            self._write_thread = None
+            self._running = False
+            self._write_queue: List[Dict[str, Any]] = []
+            self._max_queue_size = 10000
+            self._flush_interval = 1.0
+            self._batch_size = 100
+            self._ensure_data_dir()
 
     def _ensure_data_dir(self):
         """确保数据目录存在"""

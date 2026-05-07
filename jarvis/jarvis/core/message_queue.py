@@ -107,15 +107,15 @@ class Subscription:
 
 
 class MessageQueue:
-    """消息队列 - 单例模式"""
+    """消息队列 - 单例模式（线程安全）"""
 
     _instance = None
     _lock = threading.Lock()
 
     def __new__(cls):
-        if cls._instance is None:
+        if not hasattr(cls, '_instance') or cls._instance is None:
             with cls._lock:
-                if cls._instance is None:
+                if not hasattr(cls, '_instance') or cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -124,11 +124,11 @@ class MessageQueue:
         if self._initialized:
             return
 
-        self._lock = threading.RLock()
         with self._lock:
             if self._initialized:
                 return
             self._initialized = True
+            self._instance_lock = threading.RLock()
             self._topics: Dict[str, queue.PriorityQueue] = defaultdict(
                 lambda: queue.PriorityQueue(maxsize=10000)
             )
@@ -136,6 +136,7 @@ class MessageQueue:
             self._subscription_map: Dict[str, Subscription] = {}
             self._dead_letter_queue: queue.Queue = queue.Queue()
             self._message_store: Dict[str, Message] = {}
+            self._max_message_store_size = 50000
             self._executor = ThreadPoolExecutor(max_workers=20)
             self._running = False
             self._delivery_threads: Dict[str, threading.Thread] = {}
@@ -209,12 +210,29 @@ class MessageQueue:
             self._topics[topic].put(message)
             self._message_store[message_id] = message
             self._stats['total_messages'] += 1
+            
+            if len(self._message_store) > self._max_message_store_size:
+                self._cleanup_old_messages()
 
         print(f"📤 消息已发布 [{message_id}] -> 主题: {topic} (优先级: {priority.name})")
 
         self._deliver_message(message)
 
         return message_id
+    
+    def _cleanup_old_messages(self):
+        """清理旧消息，防止内存无限增长"""
+        messages_to_remove = []
+        current_time = datetime.now()
+        
+        for msg_id, msg in list(self._message_store.items()):
+            if msg.status in [MessageStatus.DELIVERED, MessageStatus.EXPIRED, MessageStatus.DEAD_LETTER]:
+                age = (current_time - msg.timestamp).total_seconds()
+                if age > 3600:
+                    messages_to_remove.append(msg_id)
+        
+        for msg_id in messages_to_remove[:10000]:
+            self._message_store.pop(msg_id, None)
 
     def subscribe(
         self,

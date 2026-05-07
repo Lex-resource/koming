@@ -88,15 +88,15 @@ class AsyncTask:
 
 
 class AsyncTaskExecutor:
-    """异步任务执行器 - 单例模式"""
+    """异步任务执行器 - 单例模式（线程安全）"""
 
     _instance = None
     _init_lock = threading.Lock()
 
     def __new__(cls, max_workers: int = 10, default_timeout: float = 300.0):
-        if cls._instance is None:
+        if not hasattr(cls, '_instance') or cls._instance is None:
             with cls._init_lock:
-                if cls._instance is None:
+                if not hasattr(cls, '_instance') or cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -105,11 +105,11 @@ class AsyncTaskExecutor:
         if self._initialized:
             return
 
-        self._lock = threading.RLock()
-        with self._lock:
+        with self._init_lock:
             if self._initialized:
                 return
             self._initialized = True
+            self._lock = threading.RLock()
             self.max_workers = max_workers
             self.default_timeout = default_timeout
             self.tasks: Dict[str, AsyncTask] = {}
