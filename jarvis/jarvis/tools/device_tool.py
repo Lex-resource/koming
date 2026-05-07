@@ -35,7 +35,7 @@ class DeviceTool:
             操作结果
         """
         original_device = device
-        device = device.replace("灯", "灯光").replace("空调", "空调")
+        device = device.replace("灯", "灯光")
         
         if device not in self._devices:
             return f"未知设备: {original_device}"
