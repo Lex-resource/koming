@@ -1,14 +1,14 @@
-from sqlalchemy import create_engine, Column, String, Text, Float, DateTime, ForeignKey, Index, BigInteger, JSON
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.pool import QueuePool
-from contextlib import contextmanager
-from datetime import datetime
+from sqlalchemy import create_engine, Column, String, Text, Float, DateTime, ForeignKey, Index, BigInteger, JSON, select, and_, or_, func
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+from sqlalchemy.pool import AsyncAdaptedQueuePool
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 import uuid
 import json
-from typing import Optional, List, Dict, Any, Generator
+from typing import Optional, List, Dict, Any, AsyncGenerator
 import os
+import asyncio
 
 Base = declarative_base()
 
@@ -16,18 +16,16 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String(255), unique=True, nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     metadata = Column(JSON, default={})
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
-
     def to_dict(self) -> Dict:
         return {
-            "id": str(self.id),
+            "id": self.id,
             "username": self.username,
             "email": self.email,
             "metadata": self.metadata,
@@ -39,20 +37,21 @@ class User(Base):
 class Conversation(Base):
     __tablename__ = "conversations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=False, index=True)
     title = Column(String(500), default="新对话")
     metadata = Column(JSON, default={})
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True)
 
-    user = relationship("User", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+    __table_args__ = (
+        Index("idx_conv_user_updated", "user_id", "updated_at"),
+    )
 
     def to_dict(self) -> Dict:
         return {
-            "id": str(self.id),
-            "user_id": str(self.user_id),
+            "id": self.id,
+            "user_id": self.user_id,
             "title": self.title,
             "metadata": self.metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -63,23 +62,21 @@ class Conversation(Base):
 class Message(Base):
     __tablename__ = "messages"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
-    role = Column(String(50), nullable=False)  # user, assistant, system
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    conversation_id = Column(String(36), nullable=False, index=True)
+    role = Column(String(50), nullable=False, index=True)
     content = Column(Text, nullable=False)
     metadata = Column(JSON, default={})
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    conversation = relationship("Conversation", back_populates="messages")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     __table_args__ = (
-        Index("idx_messages_conversation_created", "conversation_id", "created_at"),
+        Index("idx_msg_conv_created", "conversation_id", "created_at"),
     )
 
     def to_dict(self) -> Dict:
         return {
-            "id": str(self.id),
-            "conversation_id": str(self.conversation_id),
+            "id": self.id,
+            "conversation_id": self.conversation_id,
             "role": self.role,
             "content": self.content,
             "metadata": self.metadata,
@@ -91,27 +88,26 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    trace_id = Column(UUID(as_uuid=True), default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    agent_name = Column(String(100), nullable=True)
-    operation_type = Column(String(50), nullable=False)
+    trace_id = Column(String(36), default=lambda: str(uuid.uuid4()), index=True)
+    user_id = Column(String(36), nullable=True, index=True)
+    agent_name = Column(String(100), nullable=True, index=True)
+    operation_type = Column(String(50), nullable=False, index=True)
     action = Column(String(200), nullable=True)
     details = Column(JSON, default={})
     result = Column(Text, nullable=True)
     duration = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     __table_args__ = (
-        Index("idx_audit_user_created", "user_id", "created_at"),
-        Index("idx_audit_operation_created", "operation_type", "created_at"),
-        Index("idx_audit_trace", "trace_id"),
+        Index("idx_audit_type_created", "operation_type", "created_at"),
+        Index("idx_audit_agent_created", "agent_name", "created_at"),
     )
 
     def to_dict(self) -> Dict:
         return {
             "id": self.id,
-            "trace_id": str(self.trace_id) if self.trace_id else None,
-            "user_id": str(self.user_id) if self.user_id else None,
+            "trace_id": self.trace_id,
+            "user_id": self.user_id,
             "agent_name": self.agent_name,
             "operation_type": self.operation_type,
             "action": self.action,
@@ -125,29 +121,28 @@ class AuditLog(Base):
 class DataRecord(Base):
     __tablename__ = "data_records"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    record_id = Column(String(100), unique=True, nullable=False)
-    category = Column(String(100), nullable=False)
-    source = Column(String(200), nullable=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    record_id = Column(String(100), unique=True, nullable=False, index=True)
+    category = Column(String(100), nullable=False, index=True)
+    source = Column(String(200), nullable=True, index=True)
     content = Column(JSON, nullable=False)
     metadata = Column(JSON, default={})
     tags = Column(JSON, default=[])
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     __table_args__ = (
-        Index("idx_data_category_created", "category", "created_at"),
-        Index("idx_data_source", "source"),
+        Index("idx_data_cat_source", "category", "source"),
     )
 
     def to_dict(self) -> Dict:
         return {
-            "id": str(self.id),
+            "id": self.id,
             "record_id": self.record_id,
             "category": self.category,
             "source": self.source,
             "content": self.content,
             "metadata": self.metadata,
-            "tags": self.tags,
+            "tags": self.tags or [],
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
@@ -167,90 +162,91 @@ class SystemState(Base):
         }
 
 
-class Database:
-    """PostgreSQL数据库管理"""
+class AsyncDatabase:
+    """异步PostgreSQL数据库管理 - 极速版"""
 
-    def __init__(self, db_url: str = None):
-        if db_url is None:
-            db_url = os.getenv(
-                "DATABASE_URL",
-                f"postgresql://{os.getenv('DB_USER', 'postgres')}:{os.getenv('DB_PASSWORD', 'postgres')}@"
-                f"{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'jarvis')}"
-            )
+    def __init__(self):
+        db_url = os.getenv(
+            "DATABASE_URL",
+            f"postgresql+asyncpg://{os.getenv('DB_USER', 'postgres')}:{os.getenv('DB_PASSWORD', 'postgres')}@"
+            f"{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'jarvis')}"
+        )
         
-        self.engine = create_engine(
+        self.async_engine = create_async_engine(
             db_url,
-            poolclass=QueuePool,
-            pool_size=10,
-            max_overflow=20,
+            pool_size=20,
+            max_overflow=40,
             pool_pre_ping=True,
-            pool_recycle=3600,
             echo=False
         )
         
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        self.async_session = async_sessionmaker(
+            bind=self.async_engine,
+            class_=AsyncSession,
+            expire_on_commit=False
+        )
 
-    def init_db(self):
-        """初始化数据库表"""
-        Base.metadata.create_all(bind=self.engine)
+    async def init_db(self):
+        """异步初始化数据库表"""
+        async with self.async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    @contextmanager
-    def get_session(self) -> Generator:
-        """获取数据库会话的上下文管理器"""
-        session = self.SessionLocal()
-        try:
-            yield session
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+    @asynccontextmanager
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        async with self.async_session() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
-    def create_user(self, username: str, email: str, metadata: Dict = None) -> User:
-        """创建用户"""
-        with self.get_session() as session:
+    async def create_user(self, username: str, email: str, metadata: Dict = None) -> Dict:
+        async with self.get_session() as session:
             user = User(username=username, email=email, metadata=metadata or {})
             session.add(user)
-            session.flush()
+            await session.flush()
+            await session.refresh(user)
             return user.to_dict()
 
-    def get_user(self, user_id: str = None, username: str = None) -> Optional[Dict]:
-        """获取用户"""
-        with self.get_session() as session:
-            query = session.query(User)
+    async def get_user(self, user_id: str = None, username: str = None) -> Optional[Dict]:
+        async with self.get_session() as session:
+            query = select(User)
             if user_id:
-                query = query.filter(User.id == user_id)
+                query = query.where(User.id == user_id)
             elif username:
-                query = query.filter(User.username == username)
+                query = query.where(User.username == username)
             else:
                 return None
-            user = query.first()
+            result = await session.execute(query)
+            user = result.scalar_one_or_none()
             return user.to_dict() if user else None
 
-    def create_conversation(self, user_id: str, title: str = None, metadata: Dict = None) -> Dict:
-        """创建对话"""
-        with self.get_session() as session:
+    async def create_conversation(self, user_id: str, title: str = None, metadata: Dict = None) -> Dict:
+        async with self.get_session() as session:
             conversation = Conversation(
                 user_id=user_id,
                 title=title or "新对话",
                 metadata=metadata or {}
             )
             session.add(conversation)
-            session.flush()
+            await session.flush()
+            await session.refresh(conversation)
             return conversation.to_dict()
 
-    def get_conversations(self, user_id: str, limit: int = 50) -> List[Dict]:
-        """获取用户对话列表"""
-        with self.get_session() as session:
-            conversations = session.query(Conversation).filter(
-                Conversation.user_id == user_id
-            ).order_by(Conversation.updated_at.desc()).limit(limit).all()
-            return [c.to_dict() for c in conversations]
+    async def get_conversations(self, user_id: str, limit: int = 50) -> List[Dict]:
+        async with self.get_session() as session:
+            query = (
+                select(Conversation)
+                .where(Conversation.user_id == user_id)
+                .order_by(Conversation.updated_at.desc())
+                .limit(limit)
+            )
+            result = await session.execute(query)
+            return [c.to_dict() for c in result.scalars().all()]
 
-    def add_message(self, conversation_id: str, role: str, content: str, metadata: Dict = None) -> Dict:
-        """添加消息"""
-        with self.get_session() as session:
+    async def add_message(self, conversation_id: str, role: str, content: str, metadata: Dict = None) -> Dict:
+        async with self.get_session() as session:
             message = Message(
                 conversation_id=conversation_id,
                 role=role,
@@ -259,28 +255,33 @@ class Database:
             )
             session.add(message)
             
-            conversation = session.query(Conversation).filter(Conversation.id == conversation_id).first()
+            query = select(Conversation).where(Conversation.id == conversation_id)
+            result = await session.execute(query)
+            conversation = result.scalar_one_or_none()
             if conversation:
                 conversation.updated_at = datetime.utcnow()
             
-            session.flush()
+            await session.flush()
+            await session.refresh(message)
             return message.to_dict()
 
-    def get_messages(self, conversation_id: str, limit: int = 100) -> List[Dict]:
-        """获取对话消息"""
-        with self.get_session() as session:
-            messages = session.query(Message).filter(
-                Message.conversation_id == conversation_id
-            ).order_by(Message.created_at.asc()).limit(limit).all()
-            return [m.to_dict() for m in messages]
+    async def get_messages(self, conversation_id: str, limit: int = 100) -> List[Dict]:
+        async with self.get_session() as session:
+            query = (
+                select(Message)
+                .where(Message.conversation_id == conversation_id)
+                .order_by(Message.created_at.asc())
+                .limit(limit)
+            )
+            result = await session.execute(query)
+            return [m.to_dict() for m in result.scalars().all()]
 
-    def add_audit_log(self, operation_type: str, user_id: str = None,
-                      agent_name: str = None, action: str = None,
-                      details: Dict = None, result: str = None,
-                      duration: float = None) -> Dict:
-        """添加审计日志"""
-        with self.get_session() as session:
-            trace_id = uuid.uuid4()
+    async def add_audit_log(self, operation_type: str, user_id: str = None,
+                           agent_name: str = None, action: str = None,
+                           details: Dict = None, result: str = None,
+                           duration: float = None) -> Dict:
+        async with self.get_session() as session:
+            trace_id = str(uuid.uuid4())
             audit_log = AuditLog(
                 trace_id=trace_id,
                 user_id=user_id,
@@ -292,29 +293,28 @@ class Database:
                 duration=duration
             )
             session.add(audit_log)
-            session.flush()
+            await session.flush()
+            await session.refresh(audit_log)
             return audit_log.to_dict()
 
-    def get_audit_logs(self, user_id: str = None, operation_type: str = None,
-                       agent_name: str = None, limit: int = 100) -> List[Dict]:
-        """查询审计日志"""
-        with self.get_session() as session:
-            query = session.query(AuditLog)
-            
+    async def get_audit_logs(self, user_id: str = None, operation_type: str = None,
+                            agent_name: str = None, limit: int = 100) -> List[Dict]:
+        async with self.get_session() as session:
+            query = select(AuditLog)
             if user_id:
-                query = query.filter(AuditLog.user_id == user_id)
+                query = query.where(AuditLog.user_id == user_id)
             if operation_type:
-                query = query.filter(AuditLog.operation_type == operation_type)
+                query = query.where(AuditLog.operation_type == operation_type)
             if agent_name:
-                query = query.filter(AuditLog.agent_name == agent_name)
+                query = query.where(AuditLog.agent_name == agent_name)
             
-            logs = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
-            return [log.to_dict() for log in logs]
+            query = query.order_by(AuditLog.created_at.desc()).limit(limit)
+            result = await session.execute(query)
+            return [log.to_dict() for log in result.scalars().all()]
 
-    def add_data_record(self, record_id: str, category: str, source: str,
-                       content: Dict, metadata: Dict = None, tags: List[str] = None) -> Dict:
-        """添加数据记录"""
-        with self.get_session() as session:
+    async def add_data_record(self, record_id: str, category: str, source: str,
+                           content: Dict, metadata: Dict = None, tags: List[str] = None) -> Dict:
+        async with self.get_session() as session:
             record = DataRecord(
                 record_id=record_id,
                 category=category,
@@ -324,50 +324,47 @@ class Database:
                 tags=tags or []
             )
             session.add(record)
-            session.flush()
+            await session.flush()
+            await session.refresh(record)
             return record.to_dict()
 
-    def get_data_records(self, category: str = None, source: str = None,
-                        limit: int = 100) -> List[Dict]:
-        """查询数据记录"""
-        with self.get_session() as session:
-            query = session.query(DataRecord)
-            
+    async def get_data_records(self, category: str = None, source: str = None,
+                              limit: int = 100) -> List[Dict]:
+        async with self.get_session() as session:
+            query = select(DataRecord)
             if category:
-                query = query.filter(DataRecord.category == category)
+                query = query.where(DataRecord.category == category)
             if source:
-                query = query.filter(DataRecord.source == source)
+                query = query.where(DataRecord.source == source)
             
-            records = query.order_by(DataRecord.created_at.desc()).limit(limit).all()
-            return [r.to_dict() for r in records]
+            query = query.order_by(DataRecord.created_at.desc()).limit(limit)
+            result = await session.execute(query)
+            return [r.to_dict() for r in result.scalars().all()]
 
-    def set_system_state(self, key: str, value: Any) -> None:
-        """设置系统状态"""
-        with self.get_session() as session:
+    async def set_system_state(self, key: str, value: Any) -> None:
+        async with self.get_session() as session:
             state = SystemState(key=key, value=value)
-            session.merge(state)
+            session.add(state)
 
-    def get_system_state(self, key: str) -> Optional[Any]:
-        """获取系统状态"""
-        with self.get_session() as session:
-            state = session.query(SystemState).filter(SystemState.key == key).first()
+    async def get_system_state(self, key: str) -> Optional[Any]:
+        async with self.get_session() as session:
+            query = select(SystemState).where(SystemState.key == key)
+            result = await session.execute(query)
+            state = result.scalar_one_or_none()
             return state.value if state else None
 
-    def get_statistics(self) -> Dict[str, int]:
-        """获取统计信息"""
-        with self.get_session() as session:
-            return {
-                "total_users": session.query(User).count(),
-                "total_conversations": session.query(Conversation).count(),
-                "total_messages": session.query(Message).count(),
-                "total_audit_logs": session.query(AuditLog).count(),
-                "total_data_records": session.query(DataRecord).count()
-            }
-
-    def vacuum(self):
-        """清理数据库"""
-        with self.engine.connect() as conn:
-            conn.execute("VACUUM ANALYZE")
+    async def get_statistics(self) -> Dict[str, int]:
+        async with self.get_session() as session:
+            stats = {}
+            for table_name, model in [
+                ("users", User), ("conversations", Conversation),
+                ("messages", Message), ("audit_logs", AuditLog),
+                ("data_records", DataRecord)
+            ]:
+                query = select(func.count(model.id))
+                result = await session.execute(query)
+                stats[f"total_{table_name}"] = result.scalar() or 0
+            return stats
 
 
-db = Database()
+db = AsyncDatabase()

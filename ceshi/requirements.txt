@@ -20,11 +20,15 @@ playwright==1.44.0
 
 # 数据库
 psycopg2-binary==2.9.9
-sqlalchemy==2.0.30
+asyncpg==0.29.0
+sqlalchemy[asyncio]==2.0.30
 redis==5.0.8
 
 # 向量数据库
 pymilvus==2.4.4
+
+# 缓存
+cachetools==5.5.0
 
 # Web服务
 fastapi==0.111.0

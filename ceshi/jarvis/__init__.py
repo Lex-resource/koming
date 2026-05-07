@@ -12,8 +12,8 @@ from .core.data_store import data_store, DataCategory, DataRecord
 from .core.decorators import audit, store_data, audit_and_store
 from .core.global_state import global_state
 from .core.crew_manager import CrewManager
-from .core.database import db, Database
-from .core.cache import cache, Cache
+from .core.database import db, AsyncDatabase
+from .core.cache import cache, MultiLevelCache, multi_level_cache
 
 __all__ = [
     'Settings',
@@ -37,9 +37,10 @@ __all__ = [
     'global_state',
     'CrewManager',
     'db',
-    'Database',
+    'AsyncDatabase',
     'cache',
-    'Cache',
+    'MultiLevelCache',
+    'multi_level_cache',
 ]
 
 __version__ = "1.0.0"
