@@ -34,7 +34,7 @@ class PluginRegistry:
     """Agent插件注册中心 - 单例模式（线程安全）"""
 
     _instance = None
-    _init_lock = threading.Lock()
+    _lock = threading.Lock()
     _agents: Dict[str, Type] = {}
     _metadata: Dict[str, PluginMetadata] = {}
     _plugin_hooks: Dict[str, List[Callable]] = {
@@ -45,9 +45,9 @@ class PluginRegistry:
     }
 
     def __new__(cls):
-        if not hasattr(cls, '_instance') or cls._instance is None:
-            with cls._init_lock:
-                if not hasattr(cls, '_instance') or cls._instance is None:
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -55,10 +55,11 @@ class PluginRegistry:
     def __init__(self):
         if self._initialized:
             return
-        with self._init_lock:
+        with self._lock:
             if self._initialized:
                 return
             self._initialized = True
+            self._instance_lock = threading.RLock()
             self._config_file = "./data/plugin_config.json"
             self._plugins_dir = "./jarvis/plugins"
             self._instance_lock = threading.RLock()

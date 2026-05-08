@@ -111,7 +111,8 @@ class GlobalState:
         if os.path.exists(self._history_file):
             try:
                 with open(self._history_file, "r", encoding="utf-8") as f:
-                    self.conversation_history = json.load(f)
+                    loaded = json.load(f)
+                    self.conversation_history = loaded[-self.MAX_HISTORY_SIZE:]
                 self.system_status["total_interactions"] = len(self.conversation_history)
             except Exception as e:
                 print(f"加载对话历史失败: {e}")

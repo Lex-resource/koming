@@ -125,19 +125,25 @@ class ConfigManager:
     """配置管理器"""
     
     _instance = None
+    _lock = __import__('threading').Lock()
     
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
     
     def __init__(self):
         if self._initialized:
             return
-        self._initialized = True
-        self._config: Optional[FrameworkConfigModel] = None
-        self._config_file: Optional[Path] = None
+        with self._lock:
+            if self._initialized:
+                return
+            self._initialized = True
+            self._config: Optional[FrameworkConfigModel] = None
+            self._config_file: Optional[Path] = None
     
     def load_from_file(self, config_file: Union[str, Path]) -> FrameworkConfigModel:
         """从文件加载配置"""

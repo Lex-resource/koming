@@ -22,11 +22,11 @@ class DataStore:
     """数据分类存储系统 - PostgreSQL增量保存版"""
     
     _instance = None
-    _init_lock = __import__('threading').Lock()
+    _lock = __import__('threading').Lock()
     
     def __new__(cls):
         if cls._instance is None:
-            with cls._init_lock:
+            with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
@@ -36,7 +36,10 @@ class DataStore:
         if self._initialized:
             return
         
-        self._initialized = True
+        with self._lock:
+            if self._initialized:
+                return
+            self._initialized = True
         from jarvis.core.database import db as _db_instance
         self._db = _db_instance
     

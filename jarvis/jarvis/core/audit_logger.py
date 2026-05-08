@@ -28,14 +28,14 @@ class AuditLogger:
     """
 
     _instance = None
-    _init_lock = threading.Lock()
+    _lock = threading.Lock()
     _trace_counter = 0
     _counter_lock = threading.Lock()
 
     def __new__(cls):
-        if not hasattr(cls, '_instance') or cls._instance is None:
-            with cls._init_lock:
-                if not hasattr(cls, '_instance') or cls._instance is None:
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -44,7 +44,7 @@ class AuditLogger:
         if self._initialized:
             return
 
-        with self._init_lock:
+        with self._lock:
             if self._initialized:
                 return
             self._initialized = True

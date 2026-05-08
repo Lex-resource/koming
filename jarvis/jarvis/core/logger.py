@@ -9,11 +9,11 @@ from jarvis.core.database import AsyncDatabase
 
 class GlobalLogger:
     _instance = None
-    _init_lock = threading.Lock()
+    _lock = threading.Lock()
 
     def __new__(cls):
         if cls._instance is None:
-            with cls._init_lock:
+            with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
@@ -22,6 +22,11 @@ class GlobalLogger:
     def __init__(self):
         if self._initialized:
             return
+        
+        with self._lock:
+            if self._initialized:
+                return
+            self._initialized = True
 
         self._initialized = True
         from jarvis.core.database import db as _db_instance
