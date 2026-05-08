@@ -1,4 +1,5 @@
 import os
+import warnings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,8 +10,8 @@ class Settings:
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-    GLM_API_KEY = os.getenv("GLM_API_KEY")
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    GLM_API_KEY = os.getenv("GLM_API_KEY") or ""
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or ""
 
     DEFAULT_MODEL = "glm-4.5-flash"
     DEFAULT_TEMPERATURE = 0.7
@@ -18,8 +19,22 @@ class Settings:
 
     MEMORY_CHROMA_PATH = "./data/chroma"
 
+    _validated = False
+
     @classmethod
     def validate(cls):
+        if cls._validated:
+            return True
+        
         if not cls.GLM_API_KEY:
-            raise EnvironmentError("GLM_API_KEY 环境变量未设置")
+            raise EnvironmentError("GLM_API_KEY 环境变量未设置，请检查 .env 文件或环境变量")
+        
+        if not cls.OPENAI_API_KEY:
+            warnings.warn(
+                "OPENAI_API_KEY 未设置，部分功能可能不可用",
+                UserWarning,
+                stacklevel=2
+            )
+        
+        cls._validated = True
         return True

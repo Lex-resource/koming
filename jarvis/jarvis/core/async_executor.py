@@ -331,13 +331,30 @@ class AsyncTaskExecutor:
         self.tasks[task_id] = task
 
         if self.running and self.loop and self.loop.is_running():
-            try:
-                future = asyncio.run_coroutine_threadsafe(
-                    self.task_queue.put(task),
-                    self.loop
+            retry_count = 0
+            max_retries = 3
+            last_error = None
+            
+            while retry_count < max_retries:
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.task_queue.put(task),
+                        self.loop
+                    )
+                    future.result(timeout=3.0)
+                    break
+                except Exception as e:
+                    last_error = e
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        import time
+                        time.sleep(0.1 * retry_count)
+            
+            if retry_count >= max_retries:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"任务队列投递失败 [{task_id}], 使用待处理队列: {last_error}"
                 )
-                future.result(timeout=1.0)
-            except Exception as e:
                 self._pending_tasks.append(task)
         else:
             self._pending_tasks.append(task)

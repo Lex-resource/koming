@@ -43,9 +43,9 @@ class MetricsCollector:
     _lock = threading.Lock()
 
     def __new__(cls):
-        if not hasattr(cls, '_instance') or cls._instance is None:
+        if cls._instance is None:
             with cls._lock:
-                if not hasattr(cls, '_instance') or cls._instance is None:
+                if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
@@ -68,6 +68,7 @@ class MetricsCollector:
             self._lock = threading.RLock()
             self._max_histogram_size = 10000
             self._max_summary_size = 10000
+            self._max_unique_metrics = 5000
             self._hooks: Dict[str, List[Callable]] = defaultdict(list)
             self._export_formats = ["prometheus", "json", "text"]
 
@@ -109,6 +110,7 @@ class MetricsCollector:
         with self._lock:
             key = self._make_key(name, labels)
             self._counters[key] += value
+            self._cleanup_if_needed()
             self._trigger_hook(name, 'counter_inc', value, labels)
 
     def gauge_set(
@@ -128,6 +130,7 @@ class MetricsCollector:
         with self._lock:
             key = self._make_key(name, labels)
             self._gauges[key] = value
+            self._cleanup_if_needed()
             self._trigger_hook(name, 'gauge_set', value, labels)
 
     def gauge_inc(
@@ -194,6 +197,28 @@ class MetricsCollector:
 
         label_str = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
         return f"{name}{{{label_str}}}"
+
+    def _cleanup_if_needed(self):
+        """内存清理 - 当指标数量过多时清理最旧的指标"""
+        total_metrics = (
+            len(self._counters) + 
+            len(self._gauges) + 
+            len(self._histograms) + 
+            len(self._summaries)
+        )
+        
+        if total_metrics <= self._max_unique_metrics:
+            return
+        
+        cleanup_ratio = 0.2
+        for _ in range(int(total_metrics * cleanup_ratio)):
+            if self._counters:
+                oldest_counter = next(iter(self._counters))
+                del self._counters[oldest_counter]
+            
+            if self._gauges and len(self._gauges) > 100:
+                oldest_gauge = next(iter(self._gauges))
+                del self._gauges[oldest_gauge]
 
     def _parse_key(self, key: str) -> tuple:
         """解析键为名称和标签"""

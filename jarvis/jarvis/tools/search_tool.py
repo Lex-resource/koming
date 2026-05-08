@@ -117,6 +117,10 @@ class SearchTool:
                 finally:
                     browser.close()
 
+        except TimeoutError:
+            return "搜索超时，请稍后重试"
+        except ConnectionError:
+            return "网络连接失败，请检查网络"
         except Exception as e:
             return f"搜索失败: {str(e)}"
 
@@ -187,5 +191,9 @@ class SearchTool:
                 finally:
                     browser.close()
 
+        except TimeoutError:
+            return "网页抓取超时，请稍后重试"
+        except ConnectionError:
+            return "网络连接失败，请检查网络"
         except Exception as e:
             return f"网页抓取失败: {str(e)}"
