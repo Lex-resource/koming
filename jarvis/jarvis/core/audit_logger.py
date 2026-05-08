@@ -1,6 +1,8 @@
 import json
 import os
 import threading
+import time
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from enum import Enum
@@ -17,7 +19,13 @@ class OperationType(Enum):
 
 
 class AuditLogger:
-    """全局审计日志系统 - 直接写入数据库，无内存缓存（线程安全）"""
+    """全局审计日志系统 - 直接写入数据库，无内存缓存（线程安全）
+    
+    特性：
+    - 数据库不可用时自动降级到文件存储
+    - 数据库恢复后自动从文件恢复数据
+    - 文件恢复成功后自动删除临时文件
+    """
 
     _instance = None
     _init_lock = threading.Lock()
@@ -43,11 +51,18 @@ class AuditLogger:
             self._db = None
             self._instance_lock = threading.RLock()
             self._write_thread = None
+            self._recovery_thread = None
             self._running = False
             self._write_queue: List[Dict[str, Any]] = []
             self._max_queue_size = 10000
             self._flush_interval = 1.0
             self._batch_size = 100
+            self._recovery_interval = 30.0
+            self._max_recovery_batch = 500
+            self._log_file = "./data/audit_logs.jsonl"
+            self._db_available = False
+            self._last_db_check = 0
+            self._db_check_interval = 5.0
             self._ensure_data_dir()
 
     def _ensure_data_dir(self):
@@ -60,9 +75,55 @@ class AuditLogger:
             try:
                 from jarvis.core.database import db as _db_instance
                 self._db = _db_instance
+                self._db_available = True
+                print("✓ 审计日志数据库连接成功")
             except Exception as e:
                 print(f"⚠️ 审计日志数据库连接失败: {e}")
                 self._db = None
+                self._db_available = False
+                return False
+        return True
+    
+    def _check_database_connection(self) -> bool:
+        """检查数据库连接状态"""
+        current_time = time.time()
+        
+        if current_time - self._last_db_check < self._db_check_interval:
+            return self._db_available
+        
+        self._last_db_check = current_time
+        
+        if self._db is None:
+            self._init_database()
+        
+        if self._db is None:
+            self._db_available = False
+            return False
+        
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            async def check():
+                async with self._db.get_session() as session:
+                    from sqlalchemy import text
+                    await session.execute(text("SELECT 1"))
+                    return True
+            
+            loop.run_until_complete(check())
+            loop.close()
+            
+            if not self._db_available:
+                print("✓ 数据库连接已恢复，开始恢复文件数据...")
+                self._db_available = True
+            
+            return True
+            
+        except Exception as e:
+            if self._db_available:
+                print(f"⚠️ 数据库连接丢失: {e}")
+            self._db_available = False
+            return False
 
     def _get_next_trace_id(self) -> str:
         """生成唯一追踪ID（线程安全）"""
@@ -74,12 +135,15 @@ class AuditLogger:
         """启动异步写入线程"""
         if self._write_thread is None or not self._write_thread.is_alive():
             self._running = True
-            self._write_thread = threading.Thread(target=self._writer_loop, daemon=True)
+            self._write_thread = threading.Thread(target=self._writer_loop, daemon=True, name="audit_writer")
             self._write_thread.start()
+        
+        if self._recovery_thread is None or not self._recovery_thread.is_alive():
+            self._recovery_thread = threading.Thread(target=self._recovery_loop, daemon=True, name="audit_recovery")
+            self._recovery_thread.start()
 
     def _writer_loop(self):
         """后台写入循环"""
-        import time
         last_flush_time = time.time()
 
         while self._running:
@@ -98,30 +162,99 @@ class AuditLogger:
 
             except Exception as e:
                 print(f"审计日志写入线程异常: {e}")
-
-    def _flush_to_database(self):
-        """批量写入数据库"""
-        if not self._write_queue:
+                time.sleep(1.0)
+    
+    def _recovery_loop(self):
+        """数据库恢复循环 - 检查数据库连接并恢复文件数据"""
+        while self._running:
+            try:
+                if self._check_database_connection():
+                    self._recover_from_file()
+                time.sleep(self._recovery_interval)
+            except Exception as e:
+                print(f"审计日志恢复线程异常: {e}")
+                time.sleep(self._recovery_interval)
+    
+    def _recover_from_file(self):
+        """从文件恢复数据到数据库"""
+        if not os.path.exists(self._log_file):
             return
-
-        self._init_database()
-
-        if self._db is None:
-            self._fallback_write_to_file()
+        
+        file_size = os.path.getsize(self._log_file)
+        if file_size == 0:
             return
-
-        batch = self._write_queue.copy()
-        self._write_queue.clear()
-
+        
+        recovered_count = 0
+        failed_count = 0
+        remaining_records = []
+        
         try:
-            import asyncio
+            with open(self._log_file, "r", encoding="utf-8") as f:
+                batch = []
+                batch_size = 0
+                
+                for line in f:
+                    if not line.strip():
+                        continue
+                    
+                    try:
+                        record = json.loads(line)
+                        batch.append(record)
+                        batch_size += 1
+                        
+                        if batch_size >= self._max_recovery_batch:
+                            success = self._batch_insert_to_db(batch)
+                            if success:
+                                recovered_count += batch_size
+                            else:
+                                failed_count += batch_size
+                                remaining_records.extend(batch)
+                            batch = []
+                            batch_size = 0
+                            
+                    except json.JSONDecodeError:
+                        continue
+                
+                if batch:
+                    success = self._batch_insert_to_db(batch)
+                    if success:
+                        recovered_count += batch_size
+                    else:
+                        failed_count += batch_size
+                        remaining_records.extend(batch)
+            
+            if failed_count == 0 and recovered_count > 0:
+                os.remove(self._log_file)
+                print(f"✓ 审计日志已全部恢复 ({recovered_count} 条)，文件已删除")
+            elif failed_count > 0:
+                with open(self._log_file, "w", encoding="utf-8") as f:
+                    for record in remaining_records:
+                        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                print(f"⚠️ 部分审计日志恢复失败 ({recovered_count} 成功, {failed_count} 失败)")
+            else:
+                print(f"✓ 审计日志恢复检查完成 (无待恢复数据)")
+                
+        except Exception as e:
+            print(f"审计日志恢复过程异常: {e}")
+    
+    def _batch_insert_to_db(self, batch: List[Dict[str, Any]]) -> bool:
+        """批量插入数据到数据库"""
+        if not batch:
+            return True
+        
+        if self._db is None:
+            self._init_database()
+        
+        if self._db is None:
+            return False
+        
+        try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
             async def batch_insert():
                 async with self._db.get_session() as session:
                     from jarvis.core.database import AuditLog
-                    from sqlalchemy import insert
 
                     records = [
                         AuditLog(
@@ -140,13 +273,33 @@ class AuditLogger:
 
                     session.add_all(records)
                     await session.commit()
+                    return True
 
             loop.run_until_complete(batch_insert())
             loop.close()
+            return True
 
         except Exception as e:
-            print(f"审计日志批量写入数据库失败: {e}, 尝试写入文件")
-            self._write_batch_to_file(batch)
+            print(f"批量插入数据库失败: {e}")
+            return False
+
+    def _flush_to_database(self):
+        """批量写入数据库"""
+        if not self._write_queue:
+            return
+
+        if not self._check_database_connection():
+            self._fallback_write_to_file()
+            return
+
+        batch = self._write_queue.copy()
+        self._write_queue.clear()
+
+        success = self._batch_insert_to_db(batch)
+        
+        if not success:
+            self._write_queue.extend(batch)
+            self._fallback_write_to_file()
 
     def _fallback_write_to_file(self):
         """回退到文件写入"""
@@ -157,9 +310,8 @@ class AuditLogger:
 
     def _write_batch_to_file(self, batch: List[Dict[str, Any]]):
         """批量写入文件"""
-        log_file = "./data/audit_logs.jsonl"
         try:
-            with open(log_file, "a", encoding="utf-8") as f:
+            with open(self._log_file, "a", encoding="utf-8") as f:
                 for record in batch:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except Exception as e:
@@ -245,13 +397,12 @@ class AuditLogger:
 
     def _get_logs_from_file(self, limit: int = 100) -> List[Dict[str, Any]]:
         """从文件获取日志（回退方案）"""
-        log_file = "./data/audit_logs.jsonl"
-        if not os.path.exists(log_file):
+        if not os.path.exists(self._log_file):
             return []
 
         try:
             logs = []
-            with open(log_file, "r", encoding="utf-8") as f:
+            with open(self._log_file, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         try:
@@ -380,9 +531,8 @@ class AuditLogger:
         with self._instance_lock:
             self._write_queue.clear()
 
-        log_file = "./data/audit_logs.jsonl"
-        if os.path.exists(log_file):
-            os.remove(log_file)
+        if os.path.exists(self._log_file):
+            os.remove(self._log_file)
             print("✓ 审计日志文件已清空")
 
     def flush(self):
@@ -398,6 +548,34 @@ class AuditLogger:
         """获取待写入日志数量"""
         with self._instance_lock:
             return len(self._write_queue)
+    
+    def get_file_pending_count(self) -> int:
+        """获取文件中待恢复的日志数量"""
+        if not os.path.exists(self._log_file):
+            return 0
+        try:
+            with open(self._log_file, "r", encoding="utf-8") as f:
+                return sum(1 for line in f if line.strip())
+        except Exception:
+            return 0
+    
+    def get_status(self) -> Dict[str, Any]:
+        """获取审计日志系统状态"""
+        return {
+            "db_available": self._db_available,
+            "queue_size": self.get_pending_count(),
+            "file_pending_count": self.get_file_pending_count(),
+            "log_file": self._log_file,
+            "writer_running": self._write_thread.is_alive() if self._write_thread else False,
+            "recovery_running": self._recovery_thread.is_alive() if self._recovery_thread else False
+        }
+    
+    def force_recovery(self):
+        """强制执行数据库恢复"""
+        if self._check_database_connection():
+            self._recover_from_file()
+        else:
+            print("⚠️ 数据库不可用，无法执行恢复")
 
 
 audit_logger = AuditLogger()
