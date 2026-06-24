@@ -1,0 +1,1 @@
+{"timestamp": "2026-06-24T21:44:56.636953", "operation_type": "user_input", "user_id": "anonymous", "agent_name": null, "action": "task_execute_async", "details": {"user_input": "分析一下销售数据", "batch_id": "batch_6b785f8ca564", "priority": "NORMAL"}, "result": null, "duration": null, "trace_id": "1782337496_000001"}

@@ -13,6 +13,7 @@
 import os
 import sys
 import json
+import asyncio
 from datetime import datetime
 from jarvis.config.settings import Settings
 from jarvis.core.enhanced_crew_manager import EnhancedCrewManager, PluginBasedCrewManager
@@ -24,19 +25,27 @@ from jarvis.core.plugin_registry import plugin_registry, register_builtin_agents
 from jarvis.core.async_executor import async_task_executor, TaskPriority
 from jarvis.core.message_queue import message_queue
 from jarvis.core.metrics import metrics_collector, system_metrics, MetricsServer
+from jarvis.core.database import AsyncDatabase
+from jarvis.core.task_manager import task_manager
+from jarvis.core.device_manager import device_manager
+from jarvis.core.knowledge_manager import knowledge_manager
 
 
 def print_banner():
     """打印欢迎横幅"""
     print("=" * 80)
-    print("🚀 贾维斯AI助手 v2.0 - 增强版")
+    print("🚀 贾维斯AI助手 v3.0 - 架构重构版")
     print("=" * 80)
     print("支持功能:")
-    print("  • 插件系统 - 动态加载Agent")
-    print("  • 异步执行 - 后台任务处理")
+    print("  • 插件系统 - 动态加载Agent + 自动发现")
+    print("  • 异步执行 - 后台任务处理 + 优先级队列")
     print("  • 消息队列 - Agent间解耦通信")
+    print("  • 任务管理 - 指令分解 + 调度 + 执行")
+    print("  • 设备控制 - 抽象层 + 场景模式 + 批量控制")
+    print("  • 知识系统 - 向量记忆 + 知识图谱 + 偏好学习")
+    print("  • 多级缓存 - L1内存 + L2 Redis")
+    print("  • 数据持久化 - PostgreSQL + 审计日志")
     print("  • Prometheus监控 - 指标采集")
-    print("  • 微服务架构 - 分布式部署")
     print("=" * 80)
 
 
@@ -210,6 +219,66 @@ def handle_system_command(user_input: str, crew_manager: EnhancedCrewManager = N
                     print(f"    {key}: {value}")
         return True
 
+    elif cmd in ["任务", "task"]:
+        stats = task_manager.get_statistics()
+        print("\n📋 任务管理系统:")
+        sched = stats.get('调度器状态', {})
+        print(f"  - 总任务数: {sched.get('总任务数', 0)}")
+        print(f"  - 队列大小: {sched.get('队列大小', 0)}")
+        print(f"  - 运行状态: {sched.get('运行状态', '未知')}")
+        print(f"  - 状态分布: {sched.get('状态分布', {})}")
+        print(f"  - 执行历史: {stats.get('执行历史数', 0)}")
+        return True
+
+    elif cmd in ["设备", "devices"]:
+        devices = device_manager.list_all_devices()
+        print(f"\n🏠 已注册设备 (共 {len(devices)} 个):")
+        for d in devices:
+            status_icon = "🟢" if d.get('status') == 'online' else "🔴"
+            print(f"  {status_icon} {d['name']} ({d['device_type']}) - {d['status']}")
+            if d.get('properties'):
+                for k, v in d['properties'].items():
+                    print(f"      {k}: {v}")
+        return True
+
+    elif cmd.startswith("设备控制 "):
+        parts = user_input[5:].strip().split()
+        if len(parts) >= 2:
+            device_name = parts[0]
+            command = parts[1]
+            kwargs = {}
+            for p in parts[2:]:
+                if '=' in p:
+                    k, v = p.split('=', 1)
+                    kwargs[k] = v
+            result = device_manager.control_device(device_name, command, **kwargs)
+            print(f"\n🔧 设备控制结果:")
+            print(f"  {result}")
+        else:
+            print("用法: 设备控制 <设备名> <命令> [属性=值 ...]")
+        return True
+
+    elif cmd.startswith("场景 "):
+        scene_name = user_input[3:].strip()
+        result = device_manager.execute_scene(scene_name)
+        print(f"\n🎬 场景执行结果:")
+        print(f"  {result}")
+        return True
+
+    elif cmd in ["知识", "knowledge"]:
+        stats = knowledge_manager.get_knowledge_statistics()
+        print("\n🧠 知识管理系统:")
+        kg = stats.get('knowledge_graph', {})
+        print(f"  - 知识实体数: {kg.get('total_entities', 0)}")
+        print(f"  - 知识关系数: {kg.get('total_relations', 0)}")
+        print(f"  - 实体类型分布: {kg.get('entities_by_type', {})}")
+        profile = stats.get('user_profile', {})
+        print(f"  - 用户交互次数: {profile.get('interaction_count', 0)}")
+        print(f"  - 已学习偏好数: {profile.get('preference_count', 0)}")
+        mem = stats.get('memory', {})
+        print(f"  - 记忆存储模式: {mem.get('storage_mode', '未知')}")
+        return True
+
     elif cmd.startswith("批量 "):
         queries = user_input[3:].strip().split('|')
         if len(queries) > 1 and crew_manager:
@@ -250,6 +319,14 @@ def handle_system_command(user_input: str, crew_manager: EnhancedCrewManager = N
         print("    插件 - 列出所有Agent")
         print("    插件启用 <name> - 启用插件")
         print("    插件禁用 <name> - 禁用插件")
+        print("\n  任务管理:")
+        print("    任务 - 查看任务管理统计")
+        print("\n  设备控制:")
+        print("    设备 - 列出所有设备")
+        print("    设备控制 <设备名> <命令> [属性=值] - 控制设备")
+        print("    场景 <场景名> - 执行场景模式")
+        print("\n  知识系统:")
+        print("    知识 - 查看知识库统计")
         print("\n  异步命令:")
         print("    异步状态 - 查看异步执行器状态")
         print("    异步列表 - 列出异步任务")
@@ -281,7 +358,14 @@ def main(mode: str = "standard"):
     print("\n🔧 初始化系统组件...")
 
     register_builtin_agents()
+    plugin_registry.discover_from_directory()
     plugin_registry.load_config()
+
+    try:
+        db = AsyncDatabase()
+        asyncio.run(db.init_db())
+    except Exception as e:
+        print(f"⚠️ 数据库初始化跳过（将使用文件存储）: {e}")
 
     message_queue.start()
 

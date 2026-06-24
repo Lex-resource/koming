@@ -1794,6 +1794,1356 @@
     </div>
 </div>
                 </div>
+
+                <!-- 任务管理系统 -->
+                <div id="task-management" class="mb-10 bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">3.3 任务管理系统</h3>
+                    <p class="mb-4">
+                        任务管理系统负责接收、分解、调度和执行用户指令，将复杂的用户请求拆分为可执行的子任务，并协调多个智能体和工具协同完成。该系统是贾维斯从"对话"走向"行动"的核心枢纽。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- 任务分解 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.3.1 任务分解引擎</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">将用户的自然语言指令分解为结构化的子任务树，每个子任务包含目标、输入、预期输出和执行约束。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>指令解析：使用 Qwen2.5-VL 对用户输入进行深度语义解析，识别任务类型和复杂度</li>
+                                    <li>任务树构建：基于 CrewAI 的 CommanderAgent 角色进行任务规划，生成 DAG 任务图</li>
+                                    <li>依赖分析：使用 LangGraph 的状态图分析子任务间的依赖与并行关系</li>
+                                    <li>约束提取：从指令中提取时间、资源、优先级等约束条件</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>接收用户自然语言指令</li>
+                                    <li>语义解析与意图分类</li>
+                                    <li>任务复杂度评估</li>
+                                    <li>子任务分解与 DAG 构建</li>
+                                    <li>依赖关系标注与并行度分析</li>
+                                    <li>输出结构化任务树</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 任务调度 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.3.2 任务调度系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">根据任务优先级、资源可用性和依赖关系，将子任务分配给合适的智能体或工具执行，支持动态重调度。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>优先级队列：基于 ThreadPoolExecutor + 优先级队列实现任务调度，支持 LOW/NORMAL/HIGH/CRITICAL 四级</li>
+                                    <li>智能体分配：CommanderAgent 根据子任务类型将任务委派给 AnalystAgent 或 ExecutorAgent</li>
+                                    <li>资源感知：调度器感知各智能体的当前负载，避免过载</li>
+                                    <li>动态重调度：任务失败或超时时自动触发重调度，支持重试与降级策略</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>从任务队列中取出待调度任务</li>
+                                    <li>评估任务优先级与依赖状态</li>
+                                    <li>匹配可用智能体与工具资源</li>
+                                    <li>分配任务并设置超时监控</li>
+                                    <li>监听执行结果，触发后续任务或重调度</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 任务执行 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.3.3 任务执行引擎</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">执行具体子任务，调用工具或智能体完成操作，收集结果并向上汇报。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>异步执行：基于 AsyncAgentExecutor 实现后台异步任务执行，支持任务状态跟踪</li>
+                                    <li>工具调用：ExecutorAgent 挂载 SearchTool、WeatherTool、DeviceTool 等工具完成具体操作</li>
+                                    <li>结果聚合：AnalystAgent 负责收集各子任务结果并进行汇总分析</li>
+                                    <li>异常处理：执行失败时记录审计日志，触发重试或降级策略</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>接收调度器分配的子任务</li>
+                                    <li>加载对应的智能体角色与工具集</li>
+                                    <li>执行任务并记录中间状态</li>
+                                    <li>收集执行结果与审计信息</li>
+                                    <li>向上汇报结果或异常</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 任务管理流程图 -->
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">任务管理系统整体流程</h4>
+                        <div class="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-2 text-sm">
+                            <div class="flex flex-col items-center p-3 bg-neon-blue/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-comment-o text-neon-blue text-2xl mb-2"></i>
+                                <div class="text-center">用户指令</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-purple/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-sitemap text-neon-purple text-2xl mb-2"></i>
+                                <div class="text-center">任务分解</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-pink/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-tasks text-neon-pink text-2xl mb-2"></i>
+                                <div class="text-center">任务调度</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-green/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-cog text-neon-green text-2xl mb-2"></i>
+                                <div class="text-center">任务执行</div>
+                            </div>
+                            <i class="fa fa-arrow-right text-neon-green hidden md:block"></i>
+                            <i class="fa fa-arrow-down text-neon-green md:hidden"></i>
+                            <div class="flex flex-col items-center p-3 bg-neon-green/10 rounded-lg w-full md:w-1/6">
+                                <i class="fa fa-check-circle text-neon-green text-2xl mb-2"></i>
+                                <div class="text-center">结果汇总</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 设备控制系统 -->
+                <div id="device-control" class="mb-10 bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">3.4 设备控制系统</h3>
+                    <p class="mb-4">
+                        设备控制系统使贾维斯能够控制各类物理和虚拟设备，包括智能家居、实验室仪器、工作站和远程服务。系统通过统一的设备抽象层屏蔽不同协议的差异，提供一致的控制接口。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- 设备抽象层 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.4.1 设备抽象层</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">为不同类型的设备提供统一的控制接口，屏蔽底层协议差异，支持设备发现、状态查询和指令下发。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>设备模型：定义 BaseDevice 抽象基类，包含状态、能力、指令集等属性</li>
+                                    <li>协议适配：支持 MQTT、HTTP、WebSocket、串口等多种通信协议</li>
+                                    <li>设备注册：基于插件系统的设备注册机制，新设备类型通过插件动态加载</li>
+                                    <li>状态同步：设备状态变更时通过消息队列广播，订阅者实时感知</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">支持设备类型：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>智能家居：空调、灯光、窗帘、音响、安防摄像头</li>
+                                    <li>实验室设备：传感器、仪器仪表、机械臂</li>
+                                    <li>工作站：文件系统、进程管理、软件部署</li>
+                                    <li>远程服务：API 调用、云服务管理</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- 远程管理系统 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.4.2 远程管理系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">提供远程设备管理能力，支持设备发现、状态监控、批量控制和权限管理。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>设备发现：基于 mDNS/SSDP 协议自动发现局域网内的智能设备</li>
+                                    <li>状态监控：通过 Prometheus 指标采集设备运行状态，异常时触发告警</li>
+                                    <li>批量控制：支持场景模式（如"离家模式"一键关闭所有设备）</li>
+                                    <li>权限管理：基于角色的设备控制权限，防止未授权操作</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>设备发现与注册</li>
+                                    <li>建立设备通信通道</li>
+                                    <li>状态监控与心跳检测</li>
+                                    <li>接收控制指令并验证权限</li>
+                                    <li>下发指令并确认执行结果</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 自动化执行 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.4.3 自动化执行系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">基于规则和条件触发自动设备控制，实现智能化的场景联动和自动化流程。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>规则引擎：基于 IF-THEN 规则的自动化触发机制</li>
+                                    <li>场景联动：多设备协同控制，如"观影模式"联动灯光、窗帘、音响</li>
+                                    <li>定时任务：基于 cron 表达式的定时设备控制</li>
+                                    <li>条件触发：基于传感器数据、时间、用户行为的条件触发</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>监听触发条件（传感器/时间/用户行为）</li>
+                                    <li>匹配自动化规则</li>
+                                    <li>生成设备控制指令序列</li>
+                                    <li>通过设备抽象层下发指令</li>
+                                    <li>记录执行日志并反馈结果</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 设备控制核心参数 -->
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">核心性能参数</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-neon-blue/30 rounded-lg p-3">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-plug text-neon-blue mr-2"></i>
+                                    <h5 class="text-sm font-medium text-neon-blue">设备接入能力</h5>
+                                </div>
+                                <ul class="text-xs text-light-gray space-y-1">
+                                    <li>支持 MQTT/HTTP/WebSocket/串口 4 种协议</li>
+                                    <li>单节点管理设备数 > 500</li>
+                                    <li>设备发现延迟 < 3s</li>
+                                </ul>
+                            </div>
+                            <div class="border border-neon-purple/30 rounded-lg p-3">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-bolt text-neon-purple mr-2"></i>
+                                    <h5 class="text-sm font-medium text-neon-purple">控制响应能力</h5>
+                                </div>
+                                <ul class="text-xs text-light-gray space-y-1">
+                                    <li>指令下发延迟 < 100ms</li>
+                                    <li>设备状态同步延迟 < 500ms</li>
+                                    <li>批量控制并发数 > 50</li>
+                                </ul>
+                            </div>
+                            <div class="border border-neon-green/30 rounded-lg p-3">
+                                <div class="flex items-center mb-2">
+                                    <i class="fa fa-shield text-neon-green mr-2"></i>
+                                    <h5 class="text-sm font-medium text-neon-green">安全与可靠性</h5>
+                                </div>
+                                <ul class="text-xs text-light-gray space-y-1">
+                                    <li>指令加密传输 AES-256</li>
+                                    <li>权限校验覆盖率 100%</li>
+                                    <li>设备离线自动重连</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学习与知识库系统 -->
+                <div id="knowledge-system" class="bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">3.5 学习与知识库系统</h3>
+                    <p class="mb-4">
+                        学习与知识库系统赋予贾维斯持续学习和知识积累的能力。系统通过向量数据库存储和检索知识，通过记忆管理维护对话上下文，通过知识图谱构建实体关系网络，并通过个性化推荐适应用户偏好。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- 知识图谱系统 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.5.1 知识图谱系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">构建和管理结构化知识图谱，存储实体、关系和属性，支持知识推理和查询。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>图数据库：使用 Neo4j 存储知识图谱，支持 Cypher 查询语言</li>
+                                    <li>实体抽取：使用 LangChain 的实体提取工具从文本中识别实体和关系</li>
+                                    <li>知识推理：基于图谱的推理引擎，支持传递性、对称性等推理规则</li>
+                                    <li>知识融合：将多来源知识进行实体对齐和冲突消解</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>从对话和文档中提取知识三元组</li>
+                                    <li>实体对齐与去重</li>
+                                    <li>写入知识图谱</li>
+                                    <li>构建索引支持快速查询</li>
+                                    <li>提供知识推理和查询接口</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 向量记忆系统 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.5.2 向量记忆系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">基于向量数据库的长期记忆系统，支持语义检索和相似度匹配，实现知识的存储、检索和更新。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>向量数据库：使用 Milvus 2.4 + HNSW 索引（M=16, efConstruction=200）存储高维向量</li>
+                                    <li>嵌入模型：使用 OpenAI text-embedding-ada-002 生成 1536 维向量</li>
+                                    <li>语义检索：支持余弦相似度、内积、L2 距离三种度量方式</li>
+                                    <li>记忆分类：按时间、主题、重要性对记忆进行分类管理</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>将文本/对话内容向量化</li>
+                                    <li>写入 Milvus 向量数据库</li>
+                                    <li>查询时将查询文本向量化</li>
+                                    <li>HNSW 近似最近邻搜索</li>
+                                    <li>返回 Top-K 相似记忆</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 深度学习模块 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.5.3 深度学习模块</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">从用户交互中学习偏好和行为模式，持续优化响应策略和服务质量。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>偏好学习：记录用户交互历史，提取偏好特征向量</li>
+                                    <li>行为模式：基于时间序列分析用户行为规律</li>
+                                    <li>反馈学习：从用户正面/负面反馈中调整响应策略</li>
+                                    <li>模型微调：定期使用积累的数据微调 LLM 提示词</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>采集用户交互数据</li>
+                                    <li>特征提取与标注</li>
+                                    <li>训练偏好模型</li>
+                                    <li>在推理时注入用户偏好上下文</li>
+                                    <li>持续收集反馈并更新模型</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 个性化推荐系统 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">3.5.4 个性化推荐系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">基于用户画像和历史行为，主动推荐信息、服务和自动化方案。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>用户画像：构建包含偏好、习惯、日程的用户画像模型</li>
+                                    <li>协同过滤：基于相似用户的行为进行推荐</li>
+                                    <li>内容推荐：基于向量相似度的内容推荐</li>
+                                    <li>场景推荐：根据当前时间、位置、环境主动推荐</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">处理流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>加载用户画像</li>
+                                    <li>获取当前场景上下文</li>
+                                    <li>匹配推荐候选集</li>
+                                    <li>排序并过滤推荐结果</li>
+                                    <li>主动推送或按需提供</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 知识库系统架构图 -->
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">学习与知识库系统架构</h4>
+                        <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>用户交互层
+├─ 对话记忆管理（短期/长期）
+├─ 知识查询接口
+└─ 个性化推荐输出
+知识处理层
+├─ 实体抽取与关系识别
+├─ 向量化与索引构建
+├─ 知识融合与冲突消解
+└─ 偏好学习与模型更新
+知识存储层
+├─ 向量数据库（Milvus + HNSW）
+├─ 图数据库（Neo4j 知识图谱）
+├─ 关系数据库（PostgreSQL 结构化数据）
+└─ 文件存储（文档/日志/配置）</code></pre>
+                        <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                            <i class="fa fa-copy mr-1"></i>复制代码
+                        </button>
+                    </div>
+                </div>
+
             </section>
+
+            <!-- 关键技术 -->
+            <section id="tech" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-purple/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-code-fork text-neon-purple"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">四、关键技术深度解析</h2>
+                </div>
+
+                <!-- 多智能体协作 -->
+                <div id="agent-collab" class="mb-10 bg-dark-blue/30 border border-neon-purple/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-purple/50">
+                    <h3 class="text-xl font-semibold text-neon-purple mb-4">4.1 多智能体协作架构</h3>
+                    <p class="mb-4">
+                        多智能体协作是贾维斯的核心技术底座。系统采用角色化智能体编排，每个智能体承担特定职责，通过消息队列和任务委派机制实现协作。CommanderAgent 负责任务规划与分配，AnalystAgent 负责信息分析，ExecutorAgent 负责工具调用，LearnerAgent 负责经验积累。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- 角色化编排 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.1.1 角色化智能体编排</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>CrewAI 框架：基于角色的智能体定义，每个 Agent 包含 role、goal、backstory、tools 属性</li>
+                                    <li>任务委派：CommanderAgent 和 AnalystAgent 的 allow_delegation=True，支持将子任务委派给下级智能体</li>
+                                    <li>顺序执行：默认采用 sequential 流程，按 Agent 注册顺序依次执行</li>
+                                    <li>层级执行：复杂任务启用 hierarchical 流程，由管理 Agent 统筹调度</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">智能体角色定义：</h5>
+                                <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>CommanderAgent（指挥官）
+  ├─ 职责：任务规划、指令分解、智能体调度
+  ├─ 能力：allow_delegation=True
+  └─ 工具：无（纯决策角色）
+
+AnalystAgent（分析师）
+  ├─ 职责：信息收集、数据分析、方案评估
+  ├─ 能力：allow_delegation=True
+  └─ 工具：SearchTool
+
+ExecutorAgent（执行者）
+  ├─ 职责：工具调用、设备控制、任务执行
+  ├─ 能力：allow_delegation=False
+  └─ 工具：SearchTool, WeatherTool, DeviceTool
+
+LearnerAgent（学习者）
+  ├─ 职责：经验积累、知识更新、偏好学习
+  ├─ 能力：allow_delegation=False
+  └─ 工具：无（纯学习角色）</code></pre>
+                                <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                                    <i class="fa fa-copy mr-1"></i>复制代码
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 通信与协作 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.1.2 智能体通信机制</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>消息队列：基于 AgentMessageBus 实现发布/订阅模式的消息通信</li>
+                                    <li>消息优先级：支持 LOW/NORMAL/HIGH/CRITICAL 四级优先级</li>
+                                    <li>主题订阅：智能体可订阅特定主题的消息，实现定向通信</li>
+                                    <li>请求-响应：支持同步的请求-响应模式，用于需要即时反馈的场景</li>
+                                    <li>死信队列：处理失败的消息进入死信队列，避免消息丢失</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">通信流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>发送方创建消息并指定主题和优先级</li>
+                                    <li>消息进入优先级队列</li>
+                                    <li>消息总线将消息投递给订阅者</li>
+                                    <li>接收方处理消息并返回响应</li>
+                                    <li>发送方接收响应或超时处理</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 协作架构图 -->
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">多智能体协作架构</h4>
+                        <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>                    ┌──────────────┐
+                    │  用户指令输入  │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │ CommanderAgent│ ← 任务规划与分配
+                    └──┬───────┬────┘
+                       │       │
+            ┌──────────▼┐   ┌──▼──────────┐
+            │AnalystAgent│   │ExecutorAgent │ ← 并行/串行执行
+            └──────┬─────┘   └──────┬───────┘
+                   │                │
+            ┌──────▼─────┐   ┌─────▼──────┐
+            │  分析结果   │   │  执行结果   │
+            └──────┬─────┘   └─────┬──────┘
+                   │                │
+                   └───────┬────────┘
+                    ┌──────▼───────┐
+                    │ LearnerAgent │ ← 经验积累与知识更新
+                    └──────────────┘</code></pre>
+                        <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                            <i class="fa fa-copy mr-1"></i>复制代码
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 多模态融合 -->
+                <div id="multimodal" class="mb-10 bg-dark-blue/30 border border-neon-purple/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-purple/50">
+                    <h3 class="text-xl font-semibold text-neon-purple mb-4">4.2 多模态融合技术</h3>
+                    <p class="mb-4">
+                        多模态融合技术使贾维斯能够同时处理文本、语音、图像、视频等多种模态的输入，并将它们整合为统一的环境理解。系统采用 I2MoE 框架显式建模不同模态间的交互类型，实现跨模态对齐和联合推理。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <!-- 跨模态对齐 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.2.1 跨模态对齐</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">将不同模态的输入映射到统一的语义空间，实现跨模态的语义匹配和检索。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>统一嵌入空间：使用 Qwen VLo 将文本、图像、音频映射到共享嵌入空间</li>
+                                    <li>对比学习：通过对比损失优化跨模态嵌入的对齐质量</li>
+                                    <li>模态桥接：使用 Phi-4-Multimodal 作为桥接模型，连接不同模态</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- 融合推理 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.2.2 融合推理引擎</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">基于多模态输入进行联合推理，生成综合性的理解和决策。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>I2MoE 框架：显式建模多模态交互类型，提供局部和全局解释能力</li>
+                                    <li>注意力机制：跨模态注意力实现模态间的信息加权融合</li>
+                                    <li>Lumina-DiMOO：统一扩散大模型，支持多模态生成与理解</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- 模态生成 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.2.3 多模态生成</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">根据理解结果生成多模态输出，包括文本、语音、图像等。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>文本生成：Qwen2.5-VL 生成高质量文本响应</li>
+                                    <li>语音合成：GPT-4o-mini-tts 生成自然流畅的语音输出</li>
+                                    <li>图像生成：ArcMuse 2025 V1.1 生成高分辨率图像</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 多模态融合流程图 -->
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">多模态融合处理流程</h4>
+                        <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>模态输入层
+├─ 文本输入 → Qwen2.5-VL 文本编码
+├─ 语音输入 → Dolphin ASR → 文本
+├─ 图像输入 → ArcMuse 图像编码
+└─ 视频输入 → LightField Prior 帧提取
+        │
+        ▼
+特征提取层
+├─ 文本特征（768维）
+├─ 语音特征（512维）
+├─ 图像特征（1024维）
+└─ 视频特征（时序特征序列）
+        │
+        ▼
+融合推理层（I2MoE 引擎）
+├─ 跨模态注意力对齐
+├─ 交互类型建模
+├─ 联合特征表示
+└─ 综合推理输出
+        │
+        ▼
+多模态输出层
+├─ 文本响应（Qwen2.5-VL）
+├─ 语音输出（GPT-4o-mini-tts）
+├─ 图像输出（ArcMuse 生成）
+└─ 场景描述（结构化数据）</code></pre>
+                        <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                            <i class="fa fa-copy mr-1"></i>复制代码
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 智能决策推理 -->
+                <div id="decision-making" class="bg-dark-blue/30 border border-neon-purple/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-purple/50">
+                    <h3 class="text-xl font-semibold text-neon-purple mb-4">4.3 智能决策与推理</h3>
+                    <p class="mb-4">
+                        智能决策系统使贾维斯能够基于环境信息、用户历史和知识库进行自主决策。系统结合规则推理和深度学习，在保证安全性的同时提供灵活的决策能力。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <!-- 决策引擎 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.3.1 决策推理引擎</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">综合多源信息进行决策推理，支持规则推理、案例推理和深度学习推理三种模式。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>规则推理：基于知识图谱的逻辑推理，支持传递性、因果性推理</li>
+                                    <li>案例推理：从向量记忆库中检索相似历史案例，参考过往决策</li>
+                                    <li>深度推理：使用 Qwen2.5-VL 进行复杂场景的深度推理</li>
+                                    <li>决策树：基于条件分支的决策树模型，处理结构化决策</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">决策流程：</h5>
+                                <ol class="list-decimal pl-5 text-sm space-y-1">
+                                    <li>收集环境信息与用户意图</li>
+                                    <li>检索相关知识库与历史案例</li>
+                                    <li>评估可选方案与风险</li>
+                                    <li>选择最优决策并生成执行计划</li>
+                                    <li>执行后评估结果并反馈学习</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <!-- 上下文理解 -->
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">4.3.2 上下文理解系统</h4>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">功能描述：</h5>
+                                <p class="text-sm">维护和理解对话上下文、环境上下文和用户状态，为决策提供背景信息。</p>
+                            </div>
+                            <div class="mb-3">
+                                <h5 class="text-neon-green font-medium mb-2">技术实现：</h5>
+                                <ul class="list-disc pl-5 text-sm space-y-1">
+                                    <li>对话状态跟踪：使用 LangGraph 的状态图管理对话状态机</li>
+                                    <li>环境上下文：整合传感器数据、设备状态、时间位置等环境信息</li>
+                                    <li>用户状态：维护用户偏好、日程、情绪状态等用户上下文</li>
+                                    <li>上下文窗口：动态管理上下文窗口大小，平衡信息量与推理效率</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h5 class="text-neon-green font-medium mb-2">上下文层次：</h5>
+                                <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>即时上下文（当前对话轮次）
+  ├─ 用户当前输入
+  ├─ 系统当前状态
+  └─ 环境即时数据
+
+短期上下文（当前会话）
+  ├─ 对话历史（最近 N 轮）
+  ├─ 会话中提取的实体
+  └─ 临时任务状态
+
+长期上下文（跨会话）
+  ├─ 用户偏好画像
+  ├─ 长期记忆向量
+  └─ 知识图谱关系</code></pre>
+                                <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                                    <i class="fa fa-copy mr-1"></i>复制代码
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 测试评估 -->
+            <section id="testing" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-pink/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-check-square-o text-neon-pink"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">五、测试评估体系</h2>
+                </div>
+
+                <!-- 测试策略 -->
+                <div id="test-strategy" class="mb-10 bg-dark-blue/30 border border-neon-pink/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-pink/50">
+                    <h3 class="text-xl font-semibold text-neon-pink mb-4">5.1 测试策略</h3>
+                    <p class="mb-4">
+                        采用分层测试策略，从单元测试到端到端测试逐层验证系统功能。测试覆盖智能体行为、工具调用、多模态处理、设备控制和系统集成等各个方面。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">测试分层架构</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-2">
+                                <li>单元测试：验证单个模块和函数的正确性，覆盖率目标 > 80%</li>
+                                <li>集成测试：验证模块间接口和数据流的正确性</li>
+                                <li>智能体测试：验证各 Agent 的角色行为和委派逻辑</li>
+                                <li>端到端测试：模拟完整用户交互流程，验证系统整体行为</li>
+                                <li>性能测试：验证系统在高负载下的响应时间和吞吐量</li>
+                                <li>安全测试：验证权限控制、数据加密和异常处理</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">测试工具链</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-2">
+                                <li>pytest：Python 单元测试和集成测试框架</li>
+                                <li>pytest-asyncio：异步代码测试支持</li>
+                                <li>pytest-cov：测试覆盖率统计</li>
+                                <li>locust：性能和负载测试</li>
+                                <li>Playwright：浏览器自动化和 UI 测试</li>
+                                <li>Mock/MagicMock：外部依赖模拟</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 测试用例 -->
+                <div id="test-cases" class="mb-10 bg-dark-blue/30 border border-neon-pink/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-pink/50">
+                    <h3 class="text-xl font-semibold text-neon-pink mb-4">5.2 核心测试用例</h3>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-neon-green border-b border-neon-green/30">
+                                <tr>
+                                    <th class="py-3 px-4">测试场景</th>
+                                    <th class="py-3 px-4">输入</th>
+                                    <th class="py-3 px-4">预期输出</th>
+                                    <th class="py-3 px-4">验证点</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-light-gray">
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">文本对话</td>
+                                    <td class="py-3 px-4">"今天天气怎么样"</td>
+                                    <td class="py-3 px-4">返回天气信息</td>
+                                    <td class="py-3 px-4">WeatherTool 调用、结果格式</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">多轮对话</td>
+                                    <td class="py-3 px-4">连续 5 轮上下文相关提问</td>
+                                    <td class="py-3 px-4">正确理解上下文</td>
+                                    <td class="py-3 px-4">对话历史管理、上下文引用</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">设备控制</td>
+                                    <td class="py-3 px-4">"把空调调到 26 度"</td>
+                                    <td class="py-3 px-4">空调温度设为 26</td>
+                                    <td class="py-3 px-4">DeviceTool 调用、状态更新</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">异步任务</td>
+                                    <td class="py-3 px-4">"异步 搜索 AI 最新进展"</td>
+                                    <td class="py-3 px-4">返回任务 ID，后台执行</td>
+                                    <td class="py-3 px-4">任务队列、状态跟踪</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">批量执行</td>
+                                    <td class="py-3 px-4">"批量 q1|q2|q3"</td>
+                                    <td class="py-3 px-4">并行返回 3 个结果</td>
+                                    <td class="py-3 px-4">并行调度、结果聚合</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">插件管理</td>
+                                    <td class="py-3 px-4">"插件" / "插件启用 xxx"</td>
+                                    <td class="py-3 px-4">列出/启用插件</td>
+                                    <td class="py-3 px-4">插件注册、配置持久化</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4">异常处理</td>
+                                    <td class="py-3 px-4">无效指令 / 网络超时</td>
+                                    <td class="py-3 px-4">友好错误提示</td>
+                                    <td class="py-3 px-4">异常捕获、审计记录</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 性能指标 -->
+                <div id="performance-metrics" class="bg-dark-blue/30 border border-neon-pink/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-pink/50">
+                    <h3 class="text-xl font-semibold text-neon-pink mb-4">5.3 性能指标基准</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="border border-neon-blue/30 rounded-lg p-4">
+                            <div class="flex items-center mb-3">
+                                <i class="fa fa-clock-o text-neon-blue text-2xl mr-3"></i>
+                                <h4 class="text-sm font-medium text-neon-blue">响应时间</h4>
+                            </div>
+                            <ul class="text-xs text-light-gray space-y-1">
+                                <li>简单对话：< 2s</li>
+                                <li>工具调用：< 5s</li>
+                                <li>复杂任务分解：< 10s</li>
+                                <li>异步任务提交：< 500ms</li>
+                            </ul>
+                        </div>
+                        <div class="border border-neon-green/30 rounded-lg p-4">
+                            <div class="flex items-center mb-3">
+                                <i class="fa fa-tachometer text-neon-green text-2xl mr-3"></i>
+                                <h4 class="text-sm font-medium text-neon-green">吞吐量</h4>
+                            </div>
+                            <ul class="text-xs text-light-gray space-y-1">
+                                <li>并发对话：> 50 QPS</li>
+                                <li>异步任务：> 100 并发</li>
+                                <li>消息队列：> 1000 msg/s</li>
+                                <li>设备控制：> 50 并发指令</li>
+                            </ul>
+                        </div>
+                        <div class="border border-neon-purple/30 rounded-lg p-4">
+                            <div class="flex items-center mb-3">
+                                <i class="fa fa-database text-neon-purple text-2xl mr-3"></i>
+                                <h4 class="text-sm font-medium text-neon-purple">资源占用</h4>
+                            </div>
+                            <ul class="text-xs text-light-gray space-y-1">
+                                <li>内存占用：< 2GB</li>
+                                <li>向量检索延迟：< 50ms</li>
+                                <li>数据库连接池：20-60</li>
+                                <li>审计日志写入：< 10ms</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">性能测试结果可视化</h4>
+                        <div class="h-64">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 部署维护 -->
+            <section id="deployment" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-yellow/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-cloud-upload text-neon-yellow" style="color: #ffd700;"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">六、部署与维护方案</h2>
+                </div>
+
+                <!-- 部署方案 -->
+                <div id="deploy-plan" class="mb-10 bg-dark-blue/30 border border-neon-yellow/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-yellow/50">
+                    <h3 class="text-xl font-semibold mb-4" style="color: #ffd700;">6.1 部署方案</h3>
+                    <p class="mb-4">
+                        系统支持多种部署模式，从单机开发环境到分布式生产环境，可根据规模和性能需求灵活选择。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">单机模式（simple）</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-1">
+                                <li>适用场景：开发调试、个人使用</li>
+                                <li>组件：4 Agent + 3 Tool + 审计日志</li>
+                                <li>无异步执行、无消息队列、无监控</li>
+                                <li>启动命令：python main_enhanced.py --mode simple</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">标准模式（standard）</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-1">
+                                <li>适用场景：小型团队、日常使用</li>
+                                <li>新增：异步执行器、插件系统</li>
+                                <li>启动命令：python main_enhanced.py --mode standard</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">完整模式（full）</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-1">
+                                <li>适用场景：生产环境、大规模部署</li>
+                                <li>新增：消息队列、Prometheus 监控、微服务</li>
+                                <li>启动命令：python main_enhanced.py --mode full</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">Docker 容器化部署</h4>
+                        <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>version: '3.8'
+services:
+  jarvis:
+    build: .
+    ports:
+      - "8000:8000"    # Prometheus 指标
+      - "8080:8080"    # 微服务 API
+    environment:
+      - GLM_API_KEY=${GLM_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/jarvis
+      - REDIS_HOST=redis
+      - MILVUS_HOST=milvus
+    depends_on:
+      - db
+      - redis
+      - milvus
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: jarvis
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+
+  milvus:
+    image: milvusdb/milvus:v2.4.4
+    ports:
+      - "19530:19530"
+
+volumes:
+  pgdata:</code></pre>
+                        <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                            <i class="fa fa-copy mr-1"></i>复制代码
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 维护策略 -->
+                <div id="maintenance" class="mb-10 bg-dark-blue/30 border border-neon-yellow/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-yellow/50">
+                    <h3 class="text-xl font-semibold mb-4" style="color: #ffd700;">6.2 维护策略</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">日常维护</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-2">
+                                <li>日志监控：实时监控审计日志和系统日志，异常告警</li>
+                                <li>性能监控：通过 Prometheus 指标监控 CPU/内存/响应时间</li>
+                                <li>数据备份：PostgreSQL 每日全量备份，Milvus 向量数据定期导出</li>
+                                <li>健康检查：定时检测数据库、Redis、Milvus 连接状态</li>
+                                <li>插件管理：定期检查插件更新，清理禁用插件</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">故障处理</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-2">
+                                <li>自动恢复：数据库连接断开自动重试（3次/2秒间隔）</li>
+                                <li>降级策略：Redis 不可用时降级为内存缓存，Milvus 不可用时降级为内存存储</li>
+                                <li>死信处理：消息队列失败消息进入死信队列，人工介入处理</li>
+                                <li>审计追溯：通过审计日志追溯问题根因</li>
+                                <li>热更新：插件支持热加载，无需重启系统</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 升级策略 -->
+                <div id="upgrade-strategy" class="bg-dark-blue/30 border border-neon-yellow/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-yellow/50">
+                    <h3 class="text-xl font-semibold mb-4" style="color: #ffd700;">6.3 升级策略</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">插件式升级</h4>
+                            <p class="text-sm mb-3">新功能以插件形式开发，通过插件注册系统动态加载，无需修改核心代码。</p>
+                            <ul class="list-disc pl-5 text-sm space-y-1">
+                                <li>开发新 Agent 插件</li>
+                                <li>通过 @agent_plugin 装饰器注册</li>
+                                <li>配置文件控制启用/禁用</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">滚动更新</h4>
+                            <p class="text-sm mb-3">微服务架构支持逐个服务滚动更新，实现零停机部署。</p>
+                            <ul class="list-disc pl-5 text-sm space-y-1">
+                                <li>逐个服务实例更新</li>
+                                <li>健康检查通过后切流</li>
+                                <li>失败自动回滚</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">数据迁移</h4>
+                            <p class="text-sm mb-3">数据库 Schema 变更通过迁移脚本管理，支持回滚。</p>
+                            <ul class="list-disc pl-5 text-sm space-y-1">
+                                <li>Alembic 管理迁移版本</li>
+                                <li>向前兼容的 Schema 变更</li>
+                                <li>迁移前自动备份</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 项目管理 -->
+            <section id="management" class="mb-16">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-neon-green/20 flex items-center justify-center mr-3">
+                        <i class="fa fa-users text-neon-green"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white">七、项目管理</h2>
+                </div>
+
+                <!-- 组织结构 -->
+                <div id="org-structure" class="mb-10 bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">7.1 团队组织结构</h3>
+                    <p class="mb-4">
+                        项目采用敏捷开发模式，团队按功能模块划分为多个小组，每组负责特定子系统的开发和维护。
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">团队角色</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-2">
+                                <li>项目负责人：统筹技术选型、架构设计和进度管理</li>
+                                <li>AI 工程师：负责智能体编排、LLM 集成和多模态融合</li>
+                                <li>后端工程师：负责基础设施、数据库、消息队列和微服务</li>
+                                <li>工具开发工程师：负责设备控制协议、搜索工具和插件系统</li>
+                                <li>测试工程师：负责测试策略制定、用例编写和自动化测试</li>
+                                <li>运维工程师：负责部署、监控和维护</li>
+                            </ul>
+                        </div>
+                        <div class="p-5 bg-dark/50 rounded-lg border border-light-gray/20">
+                            <h4 class="text-lg font-medium text-neon-blue mb-3">协作方式</h4>
+                            <ul class="list-disc pl-5 text-sm space-y-2">
+                                <li>两周一个 Sprint，每个 Sprint 交付可用的功能增量</li>
+                                <li>每日站会同步进度和阻塞问题</li>
+                                <li>代码评审：所有 PR 需至少一人评审后合并</li>
+                                <li>文档同步：代码变更同步更新技术文档</li>
+                                <li>知识共享：每周技术分享会，交流踩坑经验和最佳实践</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">模块责任划分</h4>
+                        <pre class="text-sm overflow-x-auto text-neon-green font-mono"><code>项目负责
+├─ 架构设计 / 技术选型 / 进度管理
+│
+AI 工程组
+├─ CrewAI 智能体编排（crew_manager / enhanced_crew_manager）
+├─ LLM 集成（base_agent / config/settings）
+├─ 多模态融合（memory / 多模态接口）
+│
+后端工程组
+├─ 数据库（database / data_store）
+├─ 消息队列（message_queue）
+├─ 缓存（cache）
+├─ 微服务（microservice）
+│
+工具工程组
+├─ 搜索工具（search_tool）
+├─ 设备控制（device_tool）
+├─ 天气查询（weather_tool）
+├─ 插件系统（plugin_registry / plugins）
+│
+测试运维组
+├─ 测试用例（tests/）
+├─ 部署脚本（Docker / docker-compose）
+├─ 监控告警（metrics / audit_logger）</code></pre>
+                        <button class="mt-2 text-xs text-neon-blue hover:text-neon-green transition-colors" onclick="copyCode(this)">
+                            <i class="fa fa-copy mr-1"></i>复制代码
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 风险管理 -->
+                <div id="risk-management" class="bg-dark-blue/30 border border-neon-green/20 rounded-lg p-6 transition-all duration-300 hover:border-neon-green/50">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">7.2 风险管理</h3>
+
+                    <div class="overflow-x-auto mb-6">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-neon-pink border-b border-neon-pink/30">
+                                <tr>
+                                    <th class="py-3 px-4">风险项</th>
+                                    <th class="py-3 px-4">影响程度</th>
+                                    <th class="py-3 px-4">发生概率</th>
+                                    <th class="py-3 px-4">应对措施</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-light-gray">
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">LLM API 不可用</td>
+                                    <td class="py-3 px-4 text-neon-pink">高</td>
+                                    <td class="py-3 px-4">中</td>
+                                    <td class="py-3 px-4">多模型备份（GLM/OpenAI/Claude），自动切换</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">Milvus 向量库故障</td>
+                                    <td class="py-3 px-4 text-neon-yellow" style="color:#ffd700">中</td>
+                                    <td class="py-3 px-4">低</td>
+                                    <td class="py-3 px-4">降级到内存存储，定期备份向量数据</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">PostgreSQL 连接耗尽</td>
+                                    <td class="py-3 px-4 text-neon-pink">高</td>
+                                    <td class="py-3 px-4">低</td>
+                                    <td class="py-3 px-4">连接池（pool_size=20, max_overflow=40），审计降级到文件</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">Playwright 浏览器崩溃</td>
+                                    <td class="py-3 px-4 text-neon-yellow" style="color:#ffd700">中</td>
+                                    <td class="py-3 px-4">中</td>
+                                    <td class="py-3 px-4">自动重启浏览器实例，搜索失败时返回缓存结果</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">插件加载失败</td>
+                                    <td class="py-3 px-4 text-neon-yellow" style="color:#ffd700">中</td>
+                                    <td class="py-3 px-4">中</td>
+                                    <td class="py-3 px-4">异常隔离，不影响核心 Agent，记录错误日志</td>
+                                </tr>
+                                <tr class="border-b border-light-gray/10">
+                                    <td class="py-3 px-4">消息队列积压</td>
+                                    <td class="py-3 px-4 text-neon-yellow" style="color:#ffd700">中</td>
+                                    <td class="py-3 px-4">低</td>
+                                    <td class="py-3 px-4">死信队列兜底，监控队列长度告警</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3 px-4">API 密钥泄露</td>
+                                    <td class="py-3 px-4 text-neon-pink">高</td>
+                                    <td class="py-3 px-4">低</td>
+                                    <td class="py-3 px-4">环境变量管理，不硬编码，定期轮换</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-dark/50 p-4 rounded-lg border border-light-gray/20">
+                        <h4 class="text-lg font-medium text-neon-blue mb-3">风险监控机制</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-neon-blue/30 rounded-lg p-3">
+                                <h5 class="text-sm font-medium text-neon-blue mb-2">实时监控</h5>
+                                <p class="text-xs text-light-gray">Prometheus 指标实时采集，异常阈值触发告警</p>
+                            </div>
+                            <div class="border border-neon-green/30 rounded-lg p-3">
+                                <h5 class="text-sm font-medium text-neon-green mb-2">审计追溯</h5>
+                                <p class="text-xs text-light-gray">全链路审计日志，支持问题根因追溯</p>
+                            </div>
+                            <div class="border border-neon-purple/30 rounded-lg p-3">
+                                <h5 class="text-sm font-medium text-neon-purple mb-2">定期评估</h5>
+                                <p class="text-xs text-light-gray">每周风险评审，更新风险登记表</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
-    </div></body>
+    </div>
+
+    <script>
+        // ==================== 侧边栏子菜单切换 ====================
+        function toggleSubmenu(subId) {
+            const sub = document.getElementById(subId);
+            const icon = document.getElementById(subId.replace('-sub', '-icon'));
+            if (sub) {
+                sub.classList.toggle('hidden');
+            }
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            }
+        }
+
+        // ==================== 代码复制 ====================
+        function copyCode(button) {
+            const pre = button.previousElementSibling;
+            if (pre) {
+                const code = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+                navigator.clipboard.writeText(code).then(() => {
+                    const originalHTML = button.innerHTML;
+                    button.innerHTML = '<i class="fa fa-check mr-1"></i>已复制';
+                    button.classList.add('text-neon-green');
+                    setTimeout(() => {
+                        button.innerHTML = originalHTML;
+                        button.classList.remove('text-neon-green');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                });
+            }
+        }
+
+        // ==================== 移动端菜单 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            if (mobileMenuBtn && mobileMenu) {
+                mobileMenuBtn.addEventListener('click', function() {
+                    mobileMenu.classList.toggle('hidden');
+                });
+            }
+
+            // ==================== 平滑滚动 ====================
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+                    const target = document.querySelector(targetId);
+                    if (target) {
+                        e.preventDefault();
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        // 关闭移动端菜单
+                        if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+                            mobileMenu.classList.add('hidden');
+                        }
+                    }
+                });
+            });
+
+            // ==================== 顶部导航栏滚动效果 ====================
+            const topNav = document.getElementById('top-nav');
+            window.addEventListener('scroll', function() {
+                if (topNav) {
+                    if (window.scrollY > 50) {
+                        topNav.classList.add('shadow-lg', 'shadow-neon-blue/10');
+                    } else {
+                        topNav.classList.remove('shadow-lg', 'shadow-neon-blue/10');
+                    }
+                }
+            });
+
+            // ==================== 开发时间线图表 ====================
+            const timelineCtx = document.getElementById('developmentTimeline');
+            if (timelineCtx && typeof Chart !== 'undefined') {
+                new Chart(timelineCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['阶段1: 基础架构', '阶段2: 核心功能', '阶段3: 高级功能', '阶段4: 系统优化', '阶段5: 部署维护'],
+                        datasets: [{
+                            label: '开发周数',
+                            data: [4, 4, 4, 4, 4],
+                            backgroundColor: [
+                                'rgba(0, 240, 255, 0.6)',
+                                'rgba(57, 255, 20, 0.6)',
+                                'rgba(160, 32, 240, 0.6)',
+                                'rgba(255, 42, 109, 0.6)',
+                                'rgba(255, 215, 0, 0.6)'
+                            ],
+                            borderColor: [
+                                'rgba(0, 240, 255, 1)',
+                                'rgba(57, 255, 20, 1)',
+                                'rgba(160, 32, 240, 1)',
+                                'rgba(255, 42, 109, 1)',
+                                'rgba(255, 215, 0, 1)'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: '20周开发计划时间线',
+                                color: '#e0e0e0',
+                                font: { size: 16 }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 5,
+                                ticks: { color: '#e0e0e0', stepSize: 1 },
+                                grid: { color: 'rgba(0, 240, 255, 0.1)' }
+                            },
+                            x: {
+                                ticks: { color: '#e0e0e0', font: { size: 11 } },
+                                grid: { color: 'rgba(0, 240, 255, 0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ==================== 性能指标图表 ====================
+            const perfCtx = document.getElementById('performanceChart');
+            if (perfCtx && typeof Chart !== 'undefined') {
+                new Chart(perfCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['响应时间', '吞吐量', '并发能力', '内存效率', '检索速度', '稳定性'],
+                        datasets: [{
+                            label: '当前性能',
+                            data: [85, 72, 68, 78, 90, 82],
+                            backgroundColor: 'rgba(0, 240, 255, 0.2)',
+                            borderColor: 'rgba(0, 240, 255, 1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(0, 240, 255, 1)'
+                        }, {
+                            label: '目标值',
+                            data: [90, 80, 75, 85, 95, 90],
+                            backgroundColor: 'rgba(57, 255, 20, 0.2)',
+                            borderColor: 'rgba(57, 255, 20, 1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(57, 255, 20, 1)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#e0e0e0' }
+                            }
+                        },
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { color: '#e0e0e0', backdropColor: 'transparent' },
+                                grid: { color: 'rgba(0, 240, 255, 0.1)' },
+                                angleLines: { color: 'rgba(0, 240, 255, 0.1)' },
+                                pointLabels: { color: '#e0e0e0', font: { size: 12 } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ==================== 滚动动画 ====================
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('section, .bg-dark-blue\\/30').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -20,7 +20,14 @@ from jarvis.core.async_executor import (
 )
 from jarvis.core.message_queue import message_queue, AgentMessageBus, MessagePriority
 from jarvis.core.metrics import metrics_collector, system_metrics, AgentMetrics, setup_default_metrics
+from jarvis.core.cache import MultiLevelCache
+from jarvis.memory.memory_manager import memory_manager
+from jarvis.core.knowledge_manager import knowledge_manager
+from jarvis.core.task_manager import task_manager, TaskType
+from jarvis.core.device_manager import device_manager
 import time
+import hashlib
+import json
 
 
 class EnhancedCrewManager:
@@ -54,6 +61,12 @@ class EnhancedCrewManager:
             'learner': AgentMetrics('Learner')
         }
 
+        self.cache = MultiLevelCache()
+        self.memory = memory_manager
+        self.knowledge = knowledge_manager
+        self.task_mgr = task_manager
+        self.device_mgr = device_manager
+
         setup_default_metrics()
 
     def create_task(self, user_input: str, task_type: str = "general") -> Task:
@@ -73,14 +86,52 @@ class EnhancedCrewManager:
             expected_output="详细的任务执行结果和回复"
         )
 
+    def _cache_key(self, user_input: str) -> str:
+        """生成缓存键"""
+        return hashlib.sha256(user_input.encode('utf-8')).hexdigest()[:32]
+
+    def _retrieve_context(self, user_input: str) -> str:
+        """从知识管理系统检索相关上下文（向量记忆 + 知识图谱）"""
+        try:
+            return self.knowledge.retrieve_context(user_input, top_k=3)
+        except Exception:
+            return ""
+
+    def _store_memory(self, user_input: str, result: str):
+        """将对话存入知识管理系统（向量记忆 + 知识图谱 + 偏好学习）"""
+        try:
+            self.knowledge.store_conversation(user_input, result)
+        except Exception:
+            pass
+
+    def _learn_from_interaction(self, user_input: str, result: str):
+        """从用户交互中学习偏好"""
+        try:
+            self.knowledge.learn_preference(user_input, result)
+        except Exception:
+            pass
+
     def execute_task(self, user_input: str, task_type: str = "general") -> str:
-        """同步执行任务"""
+        """同步执行任务（带缓存和记忆增强）"""
         start_time = time.time()
 
         self.metrics['commander'].inc_active_requests(task_type)
 
+        cache_key = self._cache_key(user_input)
+
+        cached = self.cache.get(cache_key)
+        if cached:
+            duration = time.time() - start_time
+            self.metrics['commander'].record_request(
+                task_type=task_type, status="success", duration=duration
+            )
+            system_metrics.record_task(task_type, "success", duration)
+            return f"[缓存命中] {cached}"
+
         try:
-            task = self.create_task(user_input, task_type)
+            context = self._retrieve_context(user_input)
+
+            task = self.create_task(user_input + context if context else user_input, task_type)
 
             crew = Crew(
                 agents=[
@@ -103,6 +154,11 @@ class EnhancedCrewManager:
             )
 
             system_metrics.record_task(task_type, "success", duration)
+
+            self.cache.set(cache_key, str(result), ttl=3600)
+
+            self._store_memory(user_input, str(result))
+            self._learn_from_interaction(user_input, str(result))
 
             if self.enable_messaging:
                 self.message_bus.broadcast(
