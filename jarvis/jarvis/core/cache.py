@@ -1,10 +1,16 @@
-import redis
 import json
 import hashlib
 import asyncio
 from typing import Optional, Any, List, Callable
 from cachetools import TTLCache
 import os
+
+try:
+    import redis
+    _REDIS_AVAILABLE = True
+except ImportError:
+    _REDIS_AVAILABLE = False
+    redis = None
 
 
 class Cache:
@@ -14,6 +20,11 @@ class Cache:
         self._connected = False
         self.redis = None
         self.default_ttl = int(os.getenv("REDIS_TTL", 3600))
+
+        if not _REDIS_AVAILABLE:
+            print("⚠️ redis模块未安装，使用空缓存")
+            self._connected = False
+            return
 
         try:
             self.redis = redis.Redis(

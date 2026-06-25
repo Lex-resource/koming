@@ -279,6 +279,23 @@ def handle_system_command(user_input: str, crew_manager: EnhancedCrewManager = N
         print(f"  - 记忆存储模式: {mem.get('storage_mode', '未知')}")
         return True
 
+    elif cmd in ["微服务", "services"]:
+        try:
+            from jarvis.core.microservice import ServiceRegistry
+            registry = ServiceRegistry()
+            all_services = registry.get_all_services()
+            total = sum(len(v) for v in all_services.values())
+            print(f"\n🌐 微服务注册中心 (共 {total} 个服务):")
+            for sname, slist in all_services.items():
+                for s in slist:
+                    if hasattr(s, 'service_name'):
+                        print(f"  - {s.service_name} ({s.service_id}): {s.host}:{s.port} [{s.status.value if hasattr(s.status, 'value') else s.status}]")
+                    else:
+                        print(f"  - {sname}: {s}")
+        except Exception as e:
+            print(f"\n⚠️ 微服务功能未启用: {e}")
+        return True
+
     elif cmd.startswith("批量 "):
         queries = user_input[3:].strip().split('|')
         if len(queries) > 1 and crew_manager:
@@ -327,6 +344,8 @@ def handle_system_command(user_input: str, crew_manager: EnhancedCrewManager = N
         print("    场景 <场景名> - 执行场景模式")
         print("\n  知识系统:")
         print("    知识 - 查看知识库统计")
+        print("\n  微服务:")
+        print("    微服务 - 查看服务注册中心")
         print("\n  异步命令:")
         print("    异步状态 - 查看异步执行器状态")
         print("    异步列表 - 列出异步任务")
@@ -382,6 +401,23 @@ def main(mode: str = "standard"):
         except Exception as e:
             print(f"⚠️ 指标服务器启动失败: {e}")
 
+        try:
+            from jarvis.core.microservice import ServiceRegistry, AgentServiceFactory
+            service_registry = ServiceRegistry()
+            service_registry.start()
+            for name in AgentServiceFactory._services:
+                service_info = type('ServiceInfo', (), {
+                    'service_id': f"{name}_001",
+                    'service_name': name,
+                    'service_type': 'agent',
+                    'host': '127.0.0.1',
+                    'port': 8001 if 'Commander' in name else 8002,
+                })()
+                service_registry.register(service_info)
+            print(f"✓ 微服务注册中心已启动，注册 {service_registry.get_service_count()} 个服务")
+        except Exception as e:
+            print(f"⚠️ 微服务启动跳过: {e}")
+
     if mode == "plugin":
         crew_manager = PluginBasedCrewManager()
         print(f"✓ 已加载 {len(crew_manager.get_agents())} 个Agent插件")
@@ -425,6 +461,13 @@ def main(mode: str = "standard"):
 
                 if metrics_server:
                     metrics_server.stop()
+
+                if mode == "full":
+                    try:
+                        from jarvis.core.microservice import ServiceRegistry
+                        ServiceRegistry().stop()
+                    except Exception:
+                        pass
 
                 system_metrics.set_up(0)
 

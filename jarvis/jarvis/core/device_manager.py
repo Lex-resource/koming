@@ -635,6 +635,8 @@ class DeviceManager:
         """
         device = self.registry.get_device(device_id)
         if device is None:
+            device = self.registry.find_by_name(device_id)
+        if device is None:
             result = {
                 "success": False,
                 "device_id": device_id,

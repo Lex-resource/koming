@@ -615,7 +615,7 @@ service_registry = ServiceRegistry()
 
 # 示例：创建Agent服务
 class CommanderAgentService(BaseAgentService):
-    """指挥官Agent服务"""
+    """指挥官Agent服务 - 接入真实任务管理和决策引擎"""
 
     def __init__(self, host: str = "0.0.0.0", port: int = 8001):
         super().__init__(
@@ -628,13 +628,23 @@ class CommanderAgentService(BaseAgentService):
         self.register_handler("execute_task", self.execute_task)
         self.register_handler("delegate_task", self.delegate_task)
         self.register_handler("coordinate", self.coordinate)
+        self.register_handler("decide", self.decide)
 
     async def execute_task(self, user_input: str) -> Dict[str, Any]:
-        """执行任务"""
-        return {
-            "result": f"Commander executed: {user_input}",
-            "delegations": []
-        }
+        """执行任务 - 委托给 TaskManager"""
+        try:
+            from jarvis.core.task_manager import task_manager
+            result = task_manager.execute(user_input)
+            return {
+                "result": result,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "result": None,
+                "error": str(e),
+                "status": "error"
+            }
 
     async def delegate_task(self, task: str, to_agent: str) -> Dict[str, Any]:
         """委派任务"""
@@ -652,9 +662,21 @@ class CommanderAgentService(BaseAgentService):
             "status": "coordinated"
         }
 
+    async def decide(self, user_input: str) -> Dict[str, Any]:
+        """智能决策 - 委托给 DecisionEngine"""
+        try:
+            from jarvis.core.decision_engine import decision_engine
+            decision = decision_engine.decide(user_input)
+            return decision.to_dict()
+        except Exception as e:
+            return {
+                "error": str(e),
+                "status": "error"
+            }
+
 
 class ExecutorAgentService(BaseAgentService):
-    """执行者Agent服务"""
+    """执行者Agent服务 - 接入真实设备控制和知识系统"""
 
     def __init__(self, host: str = "0.0.0.0", port: int = 8002):
         super().__init__(
@@ -667,6 +689,9 @@ class ExecutorAgentService(BaseAgentService):
         self.register_handler("execute_tool", self.execute_tool)
         self.register_handler("search", self.search)
         self.register_handler("get_weather", self.get_weather)
+        self.register_handler("control_device", self.control_device)
+        self.register_handler("execute_scene", self.execute_scene)
+        self.register_handler("query_knowledge", self.query_knowledge)
 
     async def execute_tool(self, tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """执行工具"""
@@ -678,12 +703,21 @@ class ExecutorAgentService(BaseAgentService):
         }
 
     async def search(self, query: str) -> Dict[str, Any]:
-        """搜索"""
-        return {
-            "query": query,
-            "results": [f"Result for {query}"],
-            "count": 1
-        }
+        """搜索 - 委托给知识系统检索"""
+        try:
+            from jarvis.core.knowledge_manager import knowledge_manager
+            context = knowledge_manager.retrieve_context(query, top_k=5)
+            return {
+                "query": query,
+                "context": context,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "query": query,
+                "error": str(e),
+                "status": "error"
+            }
 
     async def get_weather(self, location: str) -> Dict[str, Any]:
         """获取天气"""
@@ -692,6 +726,46 @@ class ExecutorAgentService(BaseAgentService):
             "weather": "Sunny",
             "temperature": 25
         }
+
+    async def control_device(self, device_name: str, command: str, **kwargs) -> Dict[str, Any]:
+        """控制设备 - 委托给 DeviceManager"""
+        try:
+            from jarvis.core.device_manager import device_manager
+            return device_manager.control_device(device_name, command, **kwargs)
+        except Exception as e:
+            return {
+                "error": str(e),
+                "status": "error"
+            }
+
+    async def execute_scene(self, scene_name: str) -> Dict[str, Any]:
+        """执行场景 - 委托给 DeviceManager"""
+        try:
+            from jarvis.core.device_manager import device_manager
+            return device_manager.execute_scene(scene_name)
+        except Exception as e:
+            return {
+                "error": str(e),
+                "status": "error"
+            }
+
+    async def query_knowledge(self, query: str) -> Dict[str, Any]:
+        """查询知识 - 委托给 KnowledgeManager"""
+        try:
+            from jarvis.core.knowledge_manager import knowledge_manager
+            context = knowledge_manager.retrieve_context(query, top_k=3)
+            stats = knowledge_manager.get_knowledge_statistics()
+            return {
+                "query": query,
+                "context": context,
+                "knowledge_stats": stats,
+                "status": "success"
+            }
+        except Exception as e:
+            return {
+                "error": str(e),
+                "status": "error"
+            }
 
 
 # 服务工厂
