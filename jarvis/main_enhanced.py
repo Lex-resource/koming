@@ -16,12 +16,11 @@ import json
 import asyncio
 from datetime import datetime
 from jarvis.config.settings import Settings
-from jarvis.core.enhanced_crew_manager import EnhancedCrewManager, PluginBasedCrewManager
 from jarvis.core.global_state import global_state
 from jarvis.core.audit_logger import audit_logger, OperationType
 from jarvis.core.data_store import data_store, DataCategory
 from jarvis.core.decorators import audit_and_store
-from jarvis.core.plugin_registry import plugin_registry, register_builtin_agents
+from jarvis.core.plugin_registry import plugin_registry
 from jarvis.core.async_executor import async_task_executor, TaskPriority
 from jarvis.core.message_queue import message_queue
 from jarvis.core.metrics import metrics_collector, system_metrics, MetricsServer
@@ -49,7 +48,7 @@ def print_banner():
     print("=" * 80)
 
 
-def handle_system_command(user_input: str, crew_manager: EnhancedCrewManager = None) -> bool:
+def handle_system_command(user_input: str, crew_manager=None) -> bool:
     """处理系统命令"""
     cmd = user_input.lower().strip()
 
@@ -376,7 +375,6 @@ def main(mode: str = "standard"):
 
     print("\n🔧 初始化系统组件...")
 
-    register_builtin_agents()
     plugin_registry.discover_from_directory()
     plugin_registry.load_config()
 
@@ -418,17 +416,10 @@ def main(mode: str = "standard"):
         except Exception as e:
             print(f"⚠️ 微服务启动跳过: {e}")
 
-    if mode == "plugin":
-        crew_manager = PluginBasedCrewManager()
-        print(f"✓ 已加载 {len(crew_manager.get_agents())} 个Agent插件")
-    else:
-        enable_async = mode in ["standard", "full"]
-        enable_messaging = mode == "full"
-
-        crew_manager = EnhancedCrewManager(
-            enable_async=enable_async,
-            enable_messaging=enable_messaging
-        )
+    # 智能体编排流程待重建：旧的 EnhancedCrewManager / Crew 编排已移除
+    # 新的多智能体组织方案待设计，当前仅保留子系统（任务/设备/知识/决策）独立可用
+    crew_manager = None
+    print("⏳ 智能体编排流程待重建（子系统已就绪）")
 
     print("\n" + "=" * 80)
     print("✓ 系统初始化完成！")
@@ -493,7 +484,8 @@ def main(mode: str = "standard"):
 
             print("🤖 贾维斯: 正在处理您的请求...")
 
-            result = crew_manager.execute_task(user_input)
+            # 智能体编排流程待重建，当前直接走决策引擎路由
+            result = "[智能体编排待重建] 当前可通过子系统命令交互：任务/设备/场景/知识"
 
             print(f"\n🤖 贾维斯: {result}")
 

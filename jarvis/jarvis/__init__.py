@@ -49,7 +49,6 @@ _safe_import(
      "EntityType", "RelationType"],
     __all__,
 )
-_safe_import("jarvis.core.crew_manager", ["CrewManager"], __all__)
 _safe_import("jarvis.core.database", ["db", "AsyncDatabase"], __all__)
 _safe_import("jarvis.core.cache", ["cache", "MultiLevelCache", "multi_level_cache"], __all__)
 _safe_import(
