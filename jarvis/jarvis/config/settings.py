@@ -8,30 +8,50 @@
 import os
 import json
 from dataclasses import dataclass, field, asdict
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 @dataclass
 class ModelConfig:
-    """单个模型配置"""
+    """单个模型配置 - 每个模型独立配置厂商、认证、参数"""
     name: str = "glm-4.5"
+    provider: str = "openai_compatible"
     model: str = "glm-4.5"
-    temperature: float = 0.3
-    max_tokens: int = 4096
     api_key: str = ""
     base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    api_version: str = ""
+    region: str = ""
+    temperature: float = 0.3
+    max_tokens: int = 4096
     timeout: float = 60.0
     stream: bool = False
+    extra_headers: Dict[str, str] = field(default_factory=dict)
+    extra_params: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class LLMConfig:
-    """LLM 配置 - 多模型池，决策智能体可按名选择"""
+    """LLM 配置 - 多厂商多模型池，每个模型独立配置认证"""
     models: Dict[str, ModelConfig] = field(default_factory=lambda: {
-        "glm-4.5": ModelConfig(name="glm-4.5", model="glm-4.5", temperature=0.3),
-        "glm-4.5-flash": ModelConfig(name="glm-4.5-flash", model="glm-4.5-flash", temperature=0.2),
+        "glm-4.5": ModelConfig(
+            name="glm-4.5",
+            provider="openai_compatible",
+            model="glm-4.5",
+            base_url="https://open.bigmodel.cn/api/paas/v4/",
+            temperature=0.3,
+        ),
+        "glm-4.5-flash": ModelConfig(
+            name="glm-4.5-flash",
+            provider="openai_compatible",
+            model="glm-4.5-flash",
+            base_url="https://open.bigmodel.cn/api/paas/v4/",
+            temperature=0.2,
+        ),
     })
     default_model: str = "glm-4.5-flash"
+    embedding_model: str = "embedding-3"
+    embedding_api_key: str = ""
+    embedding_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
 
     def get_model(self, name: str = None) -> ModelConfig:
         """按名获取模型配置，None 用默认"""
@@ -39,6 +59,13 @@ class LLMConfig:
         if key not in self.models:
             raise ValueError(f"模型 '{key}' 未配置，可用: {list(self.models.keys())}")
         return self.models[key]
+
+    def add_model(self, config: ModelConfig) -> None:
+        """动态添加模型"""
+        self.models[config.name] = config
+
+    def list_models(self) -> List[str]:
+        return list(self.models.keys())
 
 
 @dataclass
@@ -75,8 +102,6 @@ class MemoryConfig:
     collection_name: str = "jarvis_experience"
     embedding_model: str = "embedding-3"
     embedding_dim: int = 1536
-    embedding_api_key: str = ""
-    embedding_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     top_k: int = 3
     persist_path: str = "./data/vector_store"
 
@@ -205,16 +230,53 @@ class Config:
             val = os.getenv(key)
             return val if val is not None else default
 
-        # LLM 模型池：api_key/base_url 批量应用到所有模型
-        if env("LLM_API_KEY"):
-            for model in config.llm.models.values():
-                model.api_key = env("LLM_API_KEY")
-            config.memory.embedding_api_key = env("LLM_API_KEY")
+        # 通用密钥（向后兼容）：只应用到未单独配置的模型
+        common_key = env("LLM_API_KEY")
+        common_url = env("LLM_BASE_URL")
 
-        if env("LLM_BASE_URL"):
-            for model in config.llm.models.values():
-                model.base_url = env("LLM_BASE_URL")
-            config.memory.embedding_base_url = env("LLM_BASE_URL")
+        # 按模型名独立配置：MODEL_<NAME>_API_KEY / MODEL_<NAME>_BASE_URL
+        for model_name, model_cfg in config.llm.models.items():
+            env_prefix = f"MODEL_{model_name.upper().replace('.', '_').replace('-', '_')}"
+
+            specific_key = env(f"{env_prefix}_API_KEY")
+            if specific_key:
+                model_cfg.api_key = specific_key
+            elif common_key:
+                model_cfg.api_key = common_key
+
+            specific_url = env(f"{env_prefix}_BASE_URL")
+            if specific_url:
+                model_cfg.base_url = specific_url
+            elif common_url:
+                model_cfg.base_url = common_url
+
+            specific_provider = env(f"{env_prefix}_PROVIDER")
+            if specific_provider:
+                model_cfg.provider = specific_provider
+
+            specific_model_id = env(f"{env_prefix}_MODEL")
+            if specific_model_id:
+                model_cfg.model = specific_model_id
+
+            specific_temp = env(f"{env_prefix}_TEMPERATURE")
+            if specific_temp:
+                model_cfg.temperature = float(specific_temp)
+
+        # Embedding 配置
+        embedding_key = env("EMBEDDING_API_KEY")
+        if embedding_key:
+            config.llm.embedding_api_key = embedding_key
+        elif common_key:
+            config.llm.embedding_api_key = common_key
+
+        embedding_url = env("EMBEDDING_BASE_URL")
+        if embedding_url:
+            config.llm.embedding_base_url = embedding_url
+        elif common_url:
+            config.llm.embedding_base_url = common_url
+
+        if env("EMBEDDING_MODEL"):
+            config.llm.embedding_model = env("EMBEDDING_MODEL")
 
         # 默认模型
         if env("LLM_DEFAULT_MODEL"):
@@ -286,9 +348,16 @@ class Config:
                 env_val = getattr(env_section, key)
                 default_val = getattr(default_section, key)
 
+                # LLMConfig 含多厂商模型池，逐模型合并
                 if isinstance(env_val, LLMConfig) and isinstance(default_val, LLMConfig):
                     if env_val.default_model != default_val.default_model:
                         file_section.default_model = env_val.default_model
+                    if env_val.embedding_model != default_val.embedding_model:
+                        file_section.embedding_model = env_val.embedding_model
+                    if env_val.embedding_api_key != default_val.embedding_api_key:
+                        file_section.embedding_api_key = env_val.embedding_api_key
+                    if env_val.embedding_base_url != default_val.embedding_base_url:
+                        file_section.embedding_base_url = env_val.embedding_base_url
                     for model_name, env_model in env_val.models.items():
                         default_model = default_val.models.get(model_name)
                         if default_model and env_model != default_model:
