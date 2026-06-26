@@ -12,8 +12,9 @@ from typing import Optional, Dict, Any
 
 
 @dataclass
-class LLMConfig:
-    """LLM 调用配置"""
+class ModelConfig:
+    """单个模型配置"""
+    name: str = "glm-4.5"
     model: str = "glm-4.5"
     temperature: float = 0.3
     max_tokens: int = 4096
@@ -24,9 +25,26 @@ class LLMConfig:
 
 
 @dataclass
+class LLMConfig:
+    """LLM 配置 - 多模型池，决策智能体可按名选择"""
+    models: Dict[str, ModelConfig] = field(default_factory=lambda: {
+        "glm-4.5": ModelConfig(name="glm-4.5", model="glm-4.5", temperature=0.3),
+        "glm-4.5-flash": ModelConfig(name="glm-4.5-flash", model="glm-4.5-flash", temperature=0.2),
+    })
+    default_model: str = "glm-4.5-flash"
+
+    def get_model(self, name: str = None) -> ModelConfig:
+        """按名获取模型配置，None 用默认"""
+        key = name or self.default_model
+        if key not in self.models:
+            raise ValueError(f"模型 '{key}' 未配置，可用: {list(self.models.keys())}")
+        return self.models[key]
+
+
+@dataclass
 class OrchestratorConfig:
     """决策智能体配置"""
-    llm: LLMConfig = field(default_factory=LLMConfig)
+    model: str = "glm-4.5"
     max_rounds: int = 10
     enable_self_handle: bool = True
     enable_experience_reuse: bool = True
@@ -36,7 +54,7 @@ class OrchestratorConfig:
 @dataclass
 class WorkerConfig:
     """子智能体配置"""
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="glm-4.5-flash", temperature=0.2))
+    default_model: str = "glm-4.5-flash"
     timeout: float = 120.0
     max_retries: int = 2
 
@@ -47,7 +65,7 @@ class ReviewConfig:
     enable_self_verify: bool = True
     enable_agent_review: bool = True
     max_review_rounds: int = 2
-    reviewer_llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="glm-4.5", temperature=0.1))
+    reviewer_model: str = "glm-4.5"
 
 
 @dataclass
@@ -133,6 +151,7 @@ class BlackboardConfig:
 @dataclass
 class Config:
     """全局配置 - 所有配置的根"""
+    llm: LLMConfig = field(default_factory=LLMConfig)
     orchestrator: OrchestratorConfig = field(default_factory=OrchestratorConfig)
     worker: WorkerConfig = field(default_factory=WorkerConfig)
     review: ReviewConfig = field(default_factory=ReviewConfig)
@@ -186,30 +205,36 @@ class Config:
             val = os.getenv(key)
             return val if val is not None else default
 
-        # LLM 通用配置
+        # LLM 模型池：api_key/base_url 批量应用到所有模型
         if env("LLM_API_KEY"):
-            config.orchestrator.llm.api_key = env("LLM_API_KEY")
-            config.worker.llm.api_key = env("LLM_API_KEY")
-            config.review.reviewer_llm.api_key = env("LLM_API_KEY")
+            for model in config.llm.models.values():
+                model.api_key = env("LLM_API_KEY")
             config.memory.embedding_api_key = env("LLM_API_KEY")
 
         if env("LLM_BASE_URL"):
-            config.orchestrator.llm.base_url = env("LLM_BASE_URL")
-            config.worker.llm.base_url = env("LLM_BASE_URL")
-            config.review.reviewer_llm.base_url = env("LLM_BASE_URL")
+            for model in config.llm.models.values():
+                model.base_url = env("LLM_BASE_URL")
             config.memory.embedding_base_url = env("LLM_BASE_URL")
+
+        # 默认模型
+        if env("LLM_DEFAULT_MODEL"):
+            config.llm.default_model = env("LLM_DEFAULT_MODEL")
 
         # 决策智能体模型
         if env("ORCHESTRATOR_MODEL"):
-            config.orchestrator.llm.model = env("ORCHESTRATOR_MODEL")
+            config.orchestrator.model = env("ORCHESTRATOR_MODEL")
         if env("ORCHESTRATOR_MAX_ROUNDS"):
             config.orchestrator.max_rounds = int(env("ORCHESTRATOR_MAX_ROUNDS"))
 
-        # 子智能体模型
+        # 子智能体默认模型
         if env("WORKER_MODEL"):
-            config.worker.llm.model = env("WORKER_MODEL")
+            config.worker.default_model = env("WORKER_MODEL")
         if env("WORKER_TIMEOUT"):
             config.worker.timeout = float(env("WORKER_TIMEOUT"))
+
+        # 审核模型
+        if env("REVIEWER_MODEL"):
+            config.review.reviewer_model = env("REVIEWER_MODEL")
 
         # 记忆配置
         if env("MEMORY_PROVIDER"):
@@ -262,15 +287,14 @@ class Config:
                 default_val = getattr(default_section, key)
 
                 if isinstance(env_val, LLMConfig) and isinstance(default_val, LLMConfig):
-                    for k in env_val.__dataclass_fields__:
-                        env_k = getattr(env_val, k)
-                        default_k = getattr(default_val, k)
-                        if env_k != default_k:
-                            setattr(file_section, key, env_val)
-                            break
-                else:
-                    if env_val != default_val:
-                        setattr(file_section, key, env_val)
+                    if env_val.default_model != default_val.default_model:
+                        file_section.default_model = env_val.default_model
+                    for model_name, env_model in env_val.models.items():
+                        default_model = default_val.models.get(model_name)
+                        if default_model and env_model != default_model:
+                            file_section.models[model_name] = env_model
+                elif env_val != default_val:
+                    setattr(file_section, key, env_val)
 
         return config
 

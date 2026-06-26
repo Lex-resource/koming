@@ -163,6 +163,7 @@ class AgentAssignment:
     prompt: str = ""
     tools: List[str] = field(default_factory=list)
     task: str = ""
+    model: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -171,6 +172,7 @@ class AgentAssignment:
             "prompt": self.prompt,
             "tools": self.tools,
             "task": self.task,
+            "model": self.model,
         }
 
 
