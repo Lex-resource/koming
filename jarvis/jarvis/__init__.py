@@ -11,7 +11,7 @@ from jarvis.core.models import (
     ReviewResult, ReviewVerdict, TaskStatus, ToolDefinition, ToolCall,
 )
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 __all__ = [
     "Config", "get_config", "init_config", "ModelConfig", "LLMConfig",

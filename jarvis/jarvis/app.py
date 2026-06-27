@@ -8,7 +8,7 @@
 from typing import Dict, Optional
 
 from jarvis.config.settings import Config, get_config, init_config
-from jarvis.core.interfaces import ICache, IDatabase, IDevice, ILLM, IMemory, ISearch, IStorage
+from jarvis.core.interfaces import ICache, IDatabase, IDevice, ILLM, IMemory, ISearch, ISpeech, IStorage
 from jarvis.core.models import ToolDefinition
 from jarvis.core.experience_store import ExperienceStore
 from jarvis.agents.decision_agent import DecisionAgent
@@ -23,6 +23,8 @@ class Application:
         self._init_db()
         self._tool_registry: Dict[str, ToolDefinition] = {}
         self._register_default_tools()
+        self._register_multimodal_tools()
+        self._register_voice_tools()
         self._decision_agent: Optional[DecisionAgent] = None
 
     def _build_instances(self) -> None:
@@ -83,6 +85,23 @@ class Application:
                 self.search = None
         else:
             self.search = None
+
+        # 语音
+        if self.config.voice.provider == "glm":
+            from jarvis.providers.glm_speech import GLMSpeechProvider
+            self.speech: Optional[ISpeech] = GLMSpeechProvider(
+                api_key=self.config.voice.api_key,
+                base_url=self.config.voice.base_url,
+                asr_model=self.config.voice.asr_model,
+                tts_model=self.config.voice.tts_model,
+                default_voice=self.config.voice.default_voice,
+                available_voices=self.config.voice.available_voices,
+            )
+        elif self.config.voice.provider == "mock":
+            from jarvis.providers.glm_speech import MockSpeechProvider
+            self.speech: Optional[ISpeech] = MockSpeechProvider()
+        else:
+            self.speech: Optional[ISpeech] = None
 
     def _init_db(self) -> None:
         """初始化数据库表"""
@@ -146,6 +165,112 @@ class Application:
                 handler=self.search.scrape,
             ))
 
+    def _register_multimodal_tools(self) -> None:
+        """注册多模态工具 - 让智能体能看图/看视频"""
+        mm_cfg = self.config.multimodal
+
+        def understand_image(prompt: str, images: list, model: str = None) -> str:
+            """图片理解工具 - 供 LLM function calling"""
+            images = images[:mm_cfg.max_images]
+            model = model or mm_cfg.default_vision_model
+            try:
+                resp = self.llm.chat_multimodal(
+                    model=model, prompt=prompt, images=images,
+                    temperature=mm_cfg.temperature,
+                )
+                return resp.content
+            except Exception as e:
+                return f"图片理解失败: {e}"
+
+        def understand_video(prompt: str, videos: list, model: str = None) -> str:
+            """视频理解工具 - 供 LLM function calling（需模型支持视频输入）"""
+            videos = videos[:mm_cfg.max_videos]
+            model = model or mm_cfg.default_video_model
+            try:
+                resp = self.llm.chat_multimodal(
+                    model=model, prompt=prompt, videos=videos,
+                    temperature=mm_cfg.temperature,
+                )
+                return resp.content
+            except Exception as e:
+                return f"视频理解失败: {e}"
+
+        self.register_tool(ToolDefinition(
+            name="understand_image",
+            description="理解图片内容。images 是图片 URL 或 base64 列表，prompt 是想问的问题。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "针对图片的问题"},
+                    "images": {"type": "array", "items": {"type": "string"}, "description": "图片 URL 或 base64"},
+                    "model": {"type": "string", "description": "可选，指定视觉模型"},
+                },
+                "required": ["prompt", "images"],
+            },
+            handler=understand_image,
+        ))
+        self.register_tool(ToolDefinition(
+            name="understand_video",
+            description="理解视频内容。videos 是视频 URL 或 base64 列表，prompt 是想问的问题。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "针对视频的问题"},
+                    "videos": {"type": "array", "items": {"type": "string"}, "description": "视频 URL 或 base64"},
+                    "model": {"type": "string", "description": "可选，指定视频模型"},
+                },
+                "required": ["prompt", "videos"],
+            },
+            handler=understand_video,
+        ))
+
+    def _register_voice_tools(self) -> None:
+        """注册语音工具 - 让智能体能听会说"""
+        if self.speech is None:
+            return
+
+        def transcribe_audio(audio_path: str, language: str = "zh") -> str:
+            """语音转文字工具"""
+            try:
+                return self.speech.asr(audio_path, language=language)
+            except Exception as e:
+                return f"语音识别失败: {e}"
+
+        def synthesize_speech(text: str, voice: str = "default", output_path: str = None) -> str:
+            """文字转语音工具，返回音频文件路径"""
+            try:
+                return self.speech.tts(text, voice=voice, output_path=output_path)
+            except Exception as e:
+                return f"语音合成失败: {e}"
+
+        self.register_tool(ToolDefinition(
+            name="transcribe_audio",
+            description="语音转文字。audio_path 是音频文件路径或 URL。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "audio_path": {"type": "string", "description": "音频文件路径或 URL"},
+                    "language": {"type": "string", "description": "语言代码 zh/en/ja", "default": "zh"},
+                },
+                "required": ["audio_path"],
+            },
+            handler=transcribe_audio,
+        ))
+        self.register_tool(ToolDefinition(
+            name="synthesize_speech",
+            description="文字转语音，返回生成的音频文件路径。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "要合成的文本"},
+                    "voice": {"type": "string", "description": "音色 ID，default 用默认音色"},
+                    "output_path": {"type": "string", "description": "可选，指定输出文件路径"},
+                },
+                "required": ["text"],
+            },
+            handler=synthesize_speech,
+        ))
+
     # ============ 公共 API ============
 
     def register_tool(self, tool: ToolDefinition) -> None:
@@ -165,6 +290,10 @@ class Application:
     def register_search(self, search: ISearch) -> None:
         """替换搜索实现"""
         self.search = search
+
+    def register_speech(self, speech: ISpeech) -> None:
+        """替换语音实现"""
+        self.speech = speech
 
     def get_decision_agent(self) -> DecisionAgent:
         """获取决策智能体（单例）"""
@@ -188,11 +317,46 @@ class Application:
         """主入口：处理用户输入"""
         return self.get_decision_agent().execute(user_input)
 
+    def chat_with_images(self, prompt: str, images: list, model: str = None) -> str:
+        """多模态入口：图片+文本 → 决策智能体编排"""
+        mm_cfg = self.config.multimodal
+        images = images[:mm_cfg.max_images]
+        model = model or mm_cfg.default_vision_model
+        # 把多模态信息拼成文本描述喂给决策智能体，并预置图片理解工具
+        enriched = f"[用户提供了 {len(images)} 张图片，可调用 understand_image 工具理解]\n{prompt}"
+        return self.get_decision_agent().execute(enriched)
+
+    def chat_with_videos(self, prompt: str, videos: list, model: str = None) -> str:
+        """多模态入口：视频+文本 → 决策智能体编排"""
+        mm_cfg = self.config.multimodal
+        videos = videos[:mm_cfg.max_videos]
+        model = model or mm_cfg.default_video_model
+        enriched = f"[用户提供了 {len(videos)} 个视频，可调用 understand_video 工具理解]\n{prompt}"
+        return self.get_decision_agent().execute(enriched)
+
+    def chat_with_voice(self, audio_path: str, language: str = "zh") -> str:
+        """语音入口：音频 → ASR → 决策智能体处理（不自动 TTS 回读）"""
+        if self.speech is None:
+            raise RuntimeError("未配置语音模块（config.voice.provider）")
+        text = self.speech.asr(audio_path, language=language)
+        return self.chat(text)
+
+    def speak(self, text: str, voice: str = "default", output_path: str = None) -> str:
+        """语音合成 - 把任意文本转成音频文件"""
+        if self.speech is None:
+            raise RuntimeError("未配置语音模块（config.voice.provider）")
+        return self.speech.tts(text, voice=voice, output_path=output_path)
+
     def shutdown(self) -> None:
         """清理资源"""
         if self.search is not None:
             try:
                 self.search.close()
+            except Exception:
+                pass
+        if self.speech is not None:
+            try:
+                self.speech.close()
             except Exception:
                 pass
 

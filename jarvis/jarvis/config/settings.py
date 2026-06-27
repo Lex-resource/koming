@@ -147,6 +147,37 @@ class SearchConfig:
 
 
 @dataclass
+class VoiceConfig:
+    """语音配置 - ASR 语音识别 + TTS 语音合成"""
+    provider: str = "mock"  # mock / glm / 自定义
+    api_key: str = ""
+    base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    asr_model: str = "whisper-1"
+    tts_model: str = "cogtts"
+    default_voice: str = "female-tianmei"
+    default_language: str = "zh"
+    available_voices: List[str] = field(default_factory=lambda: [
+        "female-tianmei", "female-yongjie", "female-chengshu",
+        "male-qn-qingshu", "male-qn-jingying",
+    ])
+
+
+@dataclass
+class MultimodalConfig:
+    """多模态配置 - 图片/视频理解"""
+    # 默认用于多模态理解的模型（需支持视觉/视频输入，如 glm-4.5、glm-4v）
+    default_vision_model: str = "glm-4.5"
+    # 默认用于视频理解的模型（需显式支持 video 输入）
+    default_video_model: str = "glm-4.5"
+    # 单次最大图片数
+    max_images: int = 10
+    # 单次最大视频数
+    max_videos: int = 1
+    # 默认温度
+    temperature: float = 0.3
+
+
+@dataclass
 class StorageConfig:
     """文件存储配置"""
     session_dir: str = "./sessions"
@@ -185,6 +216,8 @@ class Config:
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     device: DeviceConfig = field(default_factory=DeviceConfig)
     search: SearchConfig = field(default_factory=SearchConfig)
+    voice: VoiceConfig = field(default_factory=VoiceConfig)
+    multimodal: MultimodalConfig = field(default_factory=MultimodalConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     experience: ExperienceConfig = field(default_factory=ExperienceConfig)
     blackboard: BlackboardConfig = field(default_factory=BlackboardConfig)
@@ -321,6 +354,34 @@ class Config:
             config.device.provider = env("DEVICE_PROVIDER")
         if env("MCP_SERVER_URL"):
             config.device.mcp_server_url = env("MCP_SERVER_URL")
+
+        # 语音配置 - 优先用通用 LLM 密钥作后备
+        if env("VOICE_PROVIDER"):
+            config.voice.provider = env("VOICE_PROVIDER")
+        if env("VOICE_API_KEY"):
+            config.voice.api_key = env("VOICE_API_KEY")
+        elif common_key:
+            config.voice.api_key = common_key
+        if env("VOICE_BASE_URL"):
+            config.voice.base_url = env("VOICE_BASE_URL")
+        elif common_url:
+            config.voice.base_url = common_url
+        if env("ASR_MODEL"):
+            config.voice.asr_model = env("ASR_MODEL")
+        if env("TTS_MODEL"):
+            config.voice.tts_model = env("TTS_MODEL")
+        if env("TTS_DEFAULT_VOICE"):
+            config.voice.default_voice = env("TTS_DEFAULT_VOICE")
+
+        # 多模态配置
+        if env("VISION_MODEL"):
+            config.multimodal.default_vision_model = env("VISION_MODEL")
+        if env("VIDEO_MODEL"):
+            config.multimodal.default_video_model = env("VIDEO_MODEL")
+        if env("MAX_IMAGES"):
+            config.multimodal.max_images = int(env("MAX_IMAGES"))
+        if env("MAX_VIDEOS"):
+            config.multimodal.max_videos = int(env("MAX_VIDEOS"))
 
         # 存储配置
         if env("SESSION_DIR"):

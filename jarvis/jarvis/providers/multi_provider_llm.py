@@ -44,6 +44,20 @@ class MultiProviderLLM(ILLM):
         adapter = self._get_adapter(cfg.provider)
         return adapter.chat(cfg, messages, tools, temperature, max_tokens, **kwargs)
 
+    def chat_multimodal(
+        self,
+        model: str,
+        prompt: str,
+        images: Optional[List[str]] = None,
+        videos: Optional[List[str]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        cfg = self.config.get_model(model)
+        adapter = self._get_adapter(cfg.provider)
+        return adapter.chat_multimodal(cfg, prompt, images, videos, temperature, max_tokens, **kwargs)
+
     def chat_stream(
         self,
         model: str,
@@ -83,6 +97,19 @@ class ILLMAdapter:
         max_tokens: Optional[int],
         **kwargs
     ) -> LLMResponse:
+        raise NotImplementedError
+
+    def chat_multimodal(
+        self,
+        cfg: ModelConfig,
+        prompt: str,
+        images: Optional[List[str]] = None,
+        videos: Optional[List[str]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """多模态对话 - 厂商可按自有格式实现图片/视频输入"""
         raise NotImplementedError
 
     def chat_stream(
@@ -152,6 +179,66 @@ class OpenAICompatibleAdapter(ILLMAdapter):
             finish_reason=choice.finish_reason,
             usage=usage,
         )
+
+    def chat_multimodal(
+        self,
+        cfg: ModelConfig,
+        prompt: str,
+        images: Optional[List[str]] = None,
+        videos: Optional[List[str]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ) -> LLMResponse:
+        """多模态对话 - OpenAI image_url 格式 + GLM video_url 扩展
+
+        图片：走标准 OpenAI 格式 {"type": "image_url", "image_url": {"url": ...}}
+        视频：走智谱 GLM-4V 扩展格式 {"type": "video_url", "video_url": {"url": ...}}
+              其他厂商若不支持视频，可忽略 videos 参数（自动降级为纯文本+图片）
+
+        Args:
+            images: 图片列表，元素为 URL 或 base64 字符串（自动加 data:image 前缀）
+            videos: 视频列表，元素为 URL 或 base64 字符串
+        """
+        client = self._client(cfg)
+        content_parts: List[Dict] = [{"type": "text", "text": prompt}]
+
+        for img in (images or []):
+            url = self._normalize_media_url(img, is_image=True)
+            content_parts.append({"type": "image_url", "image_url": {"url": url}})
+
+        for vid in (videos or []):
+            url = self._normalize_media_url(vid, is_image=False)
+            content_parts.append({"type": "video_url", "video_url": {"url": url}})
+
+        messages = [{"role": "user", "content": content_parts}]
+        params = {
+            "model": cfg.model,
+            "messages": messages,
+            "temperature": temperature if temperature is not None else cfg.temperature,
+            "max_tokens": max_tokens or cfg.max_tokens,
+            **cfg.extra_params,
+            **kwargs,
+        }
+        resp = client.chat.completions.create(**params)
+        choice = resp.choices[0]
+        content = choice.message.content or ""
+        usage = {}
+        if resp.usage:
+            usage = {"prompt_tokens": resp.usage.prompt_tokens,
+                     "completion_tokens": resp.usage.completion_tokens,
+                     "total_tokens": resp.usage.total_tokens}
+        return LLMResponse(content=content, finish_reason=choice.finish_reason, usage=usage)
+
+    @staticmethod
+    def _normalize_media_url(source: str, is_image: bool) -> str:
+        """URL 原样返回；base64 自动补 data URI 前缀"""
+        if source.startswith(("http://", "https://", "data:")):
+            return source
+        # base64 裸串 → 补 data URI 前缀
+        if is_image:
+            return f"data:image/jpeg;base64,{source}"
+        return f"data:video/mp4;base64,{source}"
 
     def chat_stream(self, cfg, messages, tools=None, **kwargs) -> Iterator[str]:
         client = self._client(cfg)

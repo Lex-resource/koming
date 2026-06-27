@@ -1,8 +1,10 @@
 """HTTP 入口 - FastAPI，与 CLI 共享同一套业务逻辑"""
 
-from typing import Optional
+import os
+import tempfile
+from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
 from jarvis.app import Application, get_app
@@ -19,10 +21,23 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = None
 
 
+class MultimodalRequest(BaseModel):
+    prompt: str
+    images: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
+    model: Optional[str] = None
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: str = "default"
+    output_path: Optional[str] = None
+
+
 def create_app(config_file: Optional[str] = None) -> FastAPI:
     """创建 FastAPI 应用"""
     app_instance = get_app(config_file)
-    api = FastAPI(title="贾维斯多智能体框架", version="2.0")
+    api = FastAPI(title="贾维斯多智能体框架", version="2.1.0")
 
     @api.post("/chat", response_model=ChatResponse)
     async def chat(req: ChatRequest):
@@ -33,6 +48,70 @@ def create_app(config_file: Optional[str] = None) -> FastAPI:
             return ChatResponse(response=result)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @api.post("/chat/images", response_model=ChatResponse)
+    async def chat_with_images(req: MultimodalRequest):
+        """图片+文本对话"""
+        try:
+            result = app_instance.chat_with_images(
+                prompt=req.prompt, images=req.images or [], model=req.model,
+            )
+            return ChatResponse(response=result)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @api.post("/chat/videos", response_model=ChatResponse)
+    async def chat_with_videos(req: MultimodalRequest):
+        """视频+文本对话"""
+        try:
+            result = app_instance.chat_with_videos(
+                prompt=req.prompt, videos=req.videos or [], model=req.model,
+            )
+            return ChatResponse(response=result)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @api.post("/chat/voice", response_model=ChatResponse)
+    async def chat_with_voice(
+        audio: UploadFile = File(...),
+        language: str = Form("zh"),
+    ):
+        """语音对话 - 上传音频文件 → ASR → 决策智能体"""
+        if app_instance.speech is None:
+            raise HTTPException(status_code=400, detail="未配置语音模块")
+        suffix = os.path.splitext(audio.filename)[1] or ".mp3"
+        fd, tmp_path = tempfile.mkstemp(suffix=suffix, prefix="jarvis_voice_in_")
+        os.close(fd)
+        try:
+            content = await audio.read()
+            with open(tmp_path, "wb") as f:
+                f.write(content)
+            result = app_instance.chat_with_voice(tmp_path, language=language)
+            return ChatResponse(response=result)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+    @api.post("/tts")
+    async def text_to_speech(req: TTSRequest):
+        """文字转语音"""
+        if app_instance.speech is None:
+            raise HTTPException(status_code=400, detail="未配置语音模块")
+        try:
+            path = app_instance.speak(req.text, voice=req.voice, output_path=req.output_path)
+            return {"audio_path": path, "voice": req.voice}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @api.get("/voices")
+    async def list_voices():
+        if app_instance.speech is None:
+            return {"voices": []}
+        return {"voices": app_instance.speech.list_voices()}
 
     @api.get("/models")
     async def list_models():
@@ -61,8 +140,14 @@ def create_app(config_file: Optional[str] = None) -> FastAPI:
             "models": app_instance.llm.list_models(),
             "devices": len(app_instance.device.list_devices()),
             "scenes": len(app_instance.device.list_scenes()),
+            "voices": len(app_instance.speech.list_voices()) if app_instance.speech else 0,
             "memories": app_instance.memory.count(),
             "cache": app_instance.cache.get_stats(),
+            "voice_provider": app_instance.config.voice.provider,
+            "multimodal": {
+                "vision_model": app_instance.config.multimodal.default_vision_model,
+                "video_model": app_instance.config.multimodal.default_video_model,
+            },
         }
 
     return api
