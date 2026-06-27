@@ -130,8 +130,8 @@ class DatabaseConfig:
 
 @dataclass
 class DeviceConfig:
-    """设备控制配置"""
-    provider: str = "mock"
+    """设备控制配置 - 默认不接入，等真实 MCP 实现"""
+    provider: str = ""  # 空=未接入 / "mcp"=MCP真实设备
     mcp_server_url: str = ""
     mcp_timeout: float = 10.0
 

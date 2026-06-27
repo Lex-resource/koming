@@ -68,13 +68,12 @@ class Application:
             from jarvis.providers.sqlite_database import SQLiteDatabase
             self.database: IDatabase = SQLiteDatabase(self.config.database)
 
-        # 设备
+        # 设备 - 只留接口，不实现模拟，等真实 MCP 接入
         if self.config.device.provider == "mcp":
             from jarvis.providers.mcp_device import MCPDevice  # 预留
-            self.device: IDevice = MCPDevice(self.config.device)
+            self.device: Optional[IDevice] = MCPDevice(self.config.device)
         else:
-            from jarvis.providers.mock_device import MockDevice
-            self.device: IDevice = MockDevice()
+            self.device: Optional[IDevice] = None
 
         # 搜索
         if self.config.search.provider == "playwright":
@@ -109,46 +108,47 @@ class Application:
 
     def _register_default_tools(self) -> None:
         """注册默认工具集（封装子系统为 LLM 可调用工具）"""
-        # 设备控制
-        self.register_tool(ToolDefinition(
-            name="control_device",
-            description="控制设备。command: turn_on/turn_off/set_property/get_status",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "string", "description": "设备 ID"},
-                    "command": {"type": "string", "enum": ["turn_on", "turn_off", "set_property", "get_status"]},
-                    "property": {"type": "string", "description": "属性名（set_property 时必填）"},
-                    "value": {"description": "属性值（set_property 时必填）"},
+        # 设备控制 - 仅在设备已接入时注册
+        if self.device is not None:
+            self.register_tool(ToolDefinition(
+                name="control_device",
+                description="控制设备。command: turn_on/turn_off/set_property/get_status",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "device_id": {"type": "string", "description": "设备 ID"},
+                        "command": {"type": "string", "enum": ["turn_on", "turn_off", "set_property", "get_status"]},
+                        "property": {"type": "string", "description": "属性名（set_property 时必填）"},
+                        "value": {"description": "属性值（set_property 时必填）"},
+                    },
+                    "required": ["device_id", "command"],
                 },
-                "required": ["device_id", "command"],
-            },
-            handler=self.device.control,
-        ))
-        self.register_tool(ToolDefinition(
-            name="get_device_status",
-            description="查询设备当前状态",
-            parameters={"type": "object", "properties": {"device_id": {"type": "string"}}, "required": ["device_id"]},
-            handler=self.device.get_status,
-        ))
-        self.register_tool(ToolDefinition(
-            name="list_devices",
-            description="列出所有可用设备",
-            parameters={"type": "object", "properties": {}},
-            handler=self.device.list_devices,
-        ))
-        self.register_tool(ToolDefinition(
-            name="execute_scene",
-            description="执行场景模式（如：回家/离家/睡眠/观影）",
-            parameters={"type": "object", "properties": {"scene_name": {"type": "string"}}, "required": ["scene_name"]},
-            handler=self.device.execute_scene,
-        ))
-        self.register_tool(ToolDefinition(
-            name="list_scenes",
-            description="列出所有可用场景",
-            parameters={"type": "object", "properties": {}},
-            handler=self.device.list_scenes,
-        ))
+                handler=self.device.control,
+            ))
+            self.register_tool(ToolDefinition(
+                name="get_device_status",
+                description="查询设备当前状态",
+                parameters={"type": "object", "properties": {"device_id": {"type": "string"}}, "required": ["device_id"]},
+                handler=self.device.get_status,
+            ))
+            self.register_tool(ToolDefinition(
+                name="list_devices",
+                description="列出所有可用设备",
+                parameters={"type": "object", "properties": {}},
+                handler=self.device.list_devices,
+            ))
+            self.register_tool(ToolDefinition(
+                name="execute_scene",
+                description="执行场景模式（如：回家/离家/睡眠/观影）",
+                parameters={"type": "object", "properties": {"scene_name": {"type": "string"}}, "required": ["scene_name"]},
+                handler=self.device.execute_scene,
+            ))
+            self.register_tool(ToolDefinition(
+                name="list_scenes",
+                description="列出所有可用场景",
+                parameters={"type": "object", "properties": {}},
+                handler=self.device.list_scenes,
+            ))
 
         # 搜索
         if self.search is not None:

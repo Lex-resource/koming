@@ -86,15 +86,18 @@ def _status_text(app: Application) -> str:
     cache_stats = app.cache.get_stats()
     mem_count = app.memory.count()
     voice_count = len(app.speech.list_voices()) if app.speech else 0
+    device_count = len(app.device.list_devices()) if app.device else 0
+    scene_count = len(app.device.list_scenes()) if app.device else 0
     return (
         f"系统状态:\n"
         f"  可用模型: {app.llm.list_models()}\n"
-        f"  设备数: {len(app.device.list_devices())}\n"
-        f"  场景数: {len(app.device.list_scenes())}\n"
+        f"  设备数: {device_count}\n"
+        f"  场景数: {scene_count}\n"
         f"  音色数: {voice_count}\n"
         f"  记忆条数: {mem_count}\n"
         f"  缓存: {cache_stats}\n"
         f"  语音: {app.config.voice.provider}\n"
+        f"  设备: {app.config.device.provider}\n"
         f"  视觉模型: {app.config.multimodal.default_vision_model}\n"
         f"  视频模型: {app.config.multimodal.default_video_model}\n"
     )
@@ -106,6 +109,8 @@ def _models_text(app: Application) -> str:
 
 
 def _devices_text(app: Application) -> str:
+    if app.device is None:
+        return "设备模块未接入（仅留接口，等真实 MCP 实现）"
     devices = app.device.list_devices()
     if not devices:
         return "无设备"
@@ -116,6 +121,8 @@ def _devices_text(app: Application) -> str:
 
 
 def _scenes_text(app: Application) -> str:
+    if app.device is None:
+        return "设备模块未接入（仅留接口，等真实 MCP 实现）"
     scenes = app.device.list_scenes()
     if not scenes:
         return "无场景"

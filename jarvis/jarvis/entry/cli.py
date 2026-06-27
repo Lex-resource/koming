@@ -18,8 +18,10 @@ def main(config_file: Optional[str] = None) -> None:
     print("贾维斯多智能体框架 v2.1 - CLI")
     print("=" * 60)
     print(f"可用模型: {app.llm.list_models()}")
-    print(f"可用设备: {len(app.device.list_devices())} 个")
-    print(f"可用场景: {len(app.device.list_scenes())} 个")
+    device_count = len(app.device.list_devices()) if app.device else 0
+    scene_count = len(app.device.list_scenes()) if app.device else 0
+    print(f"可用设备: {device_count} 个 ({app.config.device.provider})")
+    print(f"可用场景: {scene_count} 个")
     print(f"视觉模型: {app.config.multimodal.default_vision_model}")
     print(f"视频模型: {app.config.multimodal.default_video_model}")
     print(f"语音模块: {app.config.voice.provider}")

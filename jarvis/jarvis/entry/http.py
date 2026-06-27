@@ -119,10 +119,14 @@ def create_app(config_file: Optional[str] = None) -> FastAPI:
 
     @api.get("/devices")
     async def list_devices():
+        if app_instance.device is None:
+            return {"devices": [], "note": "设备模块未接入（仅留接口）"}
         return {"devices": app_instance.device.list_devices()}
 
     @api.get("/scenes")
     async def list_scenes():
+        if app_instance.device is None:
+            return {"scenes": [], "note": "设备模块未接入（仅留接口）"}
         return {"scenes": app_instance.device.list_scenes()}
 
     @api.get("/sessions")
@@ -138,12 +142,13 @@ def create_app(config_file: Optional[str] = None) -> FastAPI:
     async def status():
         return {
             "models": app_instance.llm.list_models(),
-            "devices": len(app_instance.device.list_devices()),
-            "scenes": len(app_instance.device.list_scenes()),
+            "devices": len(app_instance.device.list_devices()) if app_instance.device else 0,
+            "scenes": len(app_instance.device.list_scenes()) if app_instance.device else 0,
             "voices": len(app_instance.speech.list_voices()) if app_instance.speech else 0,
             "memories": app_instance.memory.count(),
             "cache": app_instance.cache.get_stats(),
             "voice_provider": app_instance.config.voice.provider,
+            "device_provider": app_instance.config.device.provider,
             "multimodal": {
                 "vision_model": app_instance.config.multimodal.default_vision_model,
                 "video_model": app_instance.config.multimodal.default_video_model,
