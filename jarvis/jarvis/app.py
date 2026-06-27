@@ -48,12 +48,18 @@ class Application:
             from jarvis.providers.memory_cache import MemoryCache
             self.cache: ICache = MemoryCache(self.config.cache)
 
-        # 记忆
+        # 记忆 - 默认优先用 ChromaDB 真实向量检索，不可用降级到关键词匹配
         if self.config.memory.provider == "chromadb":
             try:
-                from jarvis.providers.chroma_memory import ChromaMemory  # 预留
+                from jarvis.providers.chroma_memory import ChromaMemory
                 self.memory: IMemory = ChromaMemory(self.config.memory, self.llm)
             except ImportError:
+                # chromadb 未安装，降级到关键词匹配
+                from jarvis.providers.memory_vector import InMemoryVectorStore
+                self.memory: IMemory = InMemoryVectorStore()
+            except Exception as e:
+                # chromadb 初始化失败（如 embedding 配置缺失），也降级
+                print(f"[警告] ChromaDB 初始化失败，降级到关键词匹配: {e}")
                 from jarvis.providers.memory_vector import InMemoryVectorStore
                 self.memory: IMemory = InMemoryVectorStore()
         else:
@@ -318,21 +324,26 @@ class Application:
         return self.get_decision_agent().execute(user_input)
 
     def chat_with_images(self, prompt: str, images: list, model: str = None) -> str:
-        """多模态入口：图片+文本 → 决策智能体编排"""
+        """多模态入口：图片+文本 → 直接调多模态 LLM，模型原生看图"""
         mm_cfg = self.config.multimodal
         images = images[:mm_cfg.max_images]
         model = model or mm_cfg.default_vision_model
-        # 把多模态信息拼成文本描述喂给决策智能体，并预置图片理解工具
-        enriched = f"[用户提供了 {len(images)} 张图片，可调用 understand_image 工具理解]\n{prompt}"
-        return self.get_decision_agent().execute(enriched)
+        resp = self.llm.chat_multimodal(
+            model=model, prompt=prompt, images=images,
+            temperature=mm_cfg.temperature,
+        )
+        return resp.content
 
     def chat_with_videos(self, prompt: str, videos: list, model: str = None) -> str:
-        """多模态入口：视频+文本 → 决策智能体编排"""
+        """多模态入口：视频+文本 → 直接调多模态 LLM，模型原生看视频"""
         mm_cfg = self.config.multimodal
         videos = videos[:mm_cfg.max_videos]
         model = model or mm_cfg.default_video_model
-        enriched = f"[用户提供了 {len(videos)} 个视频，可调用 understand_video 工具理解]\n{prompt}"
-        return self.get_decision_agent().execute(enriched)
+        resp = self.llm.chat_multimodal(
+            model=model, prompt=prompt, videos=videos,
+            temperature=mm_cfg.temperature,
+        )
+        return resp.content
 
     def chat_with_voice(self, audio_path: str, language: str = "zh") -> str:
         """语音入口：音频 → ASR → 决策智能体处理（不自动 TTS 回读）"""
